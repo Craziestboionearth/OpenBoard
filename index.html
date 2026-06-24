@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenBoard - Die freie Padlet-Alternative</title>
+    <!-- React & Babel UMD für Single-File-Ausführung -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Tailwind CSS v3 CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Supabase JS Library -->
@@ -13,1696 +17,1255 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <script>
-        // Tailwind Konfiguration für Dark Mode Support
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            100: '#e0e7ff',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            transition: background-color 0.3s ease, color 0.3s ease;
         }
-        /* Custom Scrollbars */
+        /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: rgba(241, 245, 249, 0.5);
-            border-radius: 8px;
-        }
-        .dark ::-webkit-scrollbar-track {
-            background: rgba(30, 41, 59, 0.5);
+            background: #f1f5f9;
+            border-radius: 4px;
         }
         ::-webkit-scrollbar-thumb {
-            background: rgba(203, 213, 225, 0.8);
-            border-radius: 8px;
+            background: #cbd5e1;
+            border-radius: 4px;
         }
-        .dark ::-webkit-scrollbar-thumb {
-            background: rgba(71, 85, 105, 0.8);
-        }
-        .board-bg-cover {
-            background-position: center;
-            background-size: cover;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }
-        /* Reaction animation */
-        .reaction-popover {
-            animation: popoverFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        @keyframes popoverFadeIn {
-            from { opacity: 0; transform: translateY(10px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
     </style>
 </head>
-<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800">
 
-    <!-- --- GLOBAL TOAST SYSTEM --- -->
-    <div id="toast-container" class="fixed bottom-6 right-6 z-[9999] hidden pointer-events-none">
-        <div id="toast-box" class="flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-white font-semibold text-sm transition-all duration-300 transform translate-y-0">
-            <i id="toast-icon" class="fa-solid text-base"></i>
-            <span id="toast-message"></span>
-        </div>
-    </div>
+    <div id="root"></div>
 
-    <!-- --- CONFIRMATION MODAL --- -->
-    <div id="confirm-modal" class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col gap-5">
-            <div class="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
-                <i class="fa-solid fa-triangle-exclamation text-amber-500 text-xl"></i>
-            </div>
-            <div>
-                <h3 id="confirm-title" class="font-extrabold text-xl text-slate-900 dark:text-white mb-2">Aktion bestätigen</h3>
-                <p id="confirm-message" class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed"></p>
-            </div>
-            <div class="flex justify-end gap-3 pt-2">
-                <button id="confirm-btn-cancel" class="px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition">Abbrechen</button>
-                <button id="confirm-btn-ok" class="px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-lg shadow-rose-600/20 transition">Ausführen</button>
-            </div>
-        </div>
-    </div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
 
-    <!-- --- AUTHENTICATE MODAL --- -->
-    <div id="auth-modal" class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col gap-6">
-            <div class="flex justify-between items-center">
-                <h2 id="auth-title" class="text-2xl font-extrabold text-slate-900 dark:text-white">Anmelden</h2>
-                <button id="btn-close-auth" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            
-            <form id="auth-form" class="space-y-4">
-                <div id="auth-username-field" class="space-y-1 hidden">
-                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Benutzername</label>
-                    <input id="auth-username" type="text" placeholder="dein_name" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white font-medium">
-                </div>
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">E-Mail Adresse</label>
-                    <input id="auth-email" type="email" required placeholder="name@beispiel.de" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white font-medium">
-                </div>
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Passwort</label>
-                    <input id="auth-password" type="password" required placeholder="••••••••" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white font-medium">
-                </div>
-
-                <button type="submit" id="auth-submit-btn" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-brand-600/20 text-sm mt-2">Jetzt Anmelden</button>
-            </form>
-
-            <div class="text-center text-xs text-slate-400 mt-2">
-                <button id="auth-toggle-mode" class="hover:underline font-bold text-brand-500">Noch kein Konto? Hier registrieren</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- --- ACCOUNT SETTINGS MODAL --- -->
-    <div id="account-modal" class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden max-h-[90vh]">
-            <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
-                <h2 class="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-                    <i class="fa-solid fa-user-gear text-brand-500"></i>
-                    Mein Account
-                </h2>
-                <button id="btn-close-account" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-slate-400 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-
-            <form id="account-form" class="p-8 space-y-6 overflow-y-auto flex-1">
-                <!-- Avatar Upload -->
-                <div class="flex items-center gap-4 bg-slate-50 dark:bg-slate-700/30 p-4 rounded-2xl">
-                    <div class="relative group">
-                        <img id="acc-avatar-preview" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80" alt="Avatar" class="w-16 h-16 rounded-full object-cover border-2 border-slate-200 dark:border-slate-600">
-                        <label class="absolute inset-0 bg-slate-900/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer text-white text-xs"><i class="fa-solid fa-camera"></i></label>
-                        <input id="acc-avatar-upload" type="file" accept="image/*" class="hidden">
-                    </div>
-                    <div>
-                        <span class="font-extrabold text-slate-800 dark:text-white text-base block" id="acc-username-display">Benutzername</span>
-                        <span class="text-xs text-slate-400 font-semibold" id="acc-email-display">email@beispiel.de</span>
-                    </div>
-                </div>
-
-                <div class="space-y-4">
-                    <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider">Benutzerdaten ändern</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-slate-400">Neuer Benutzername</label>
-                            <input id="acc-new-username" type="text" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none dark:text-white">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-slate-400">Neue E-Mail</label>
-                            <input id="acc-new-email" type="email" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none dark:text-white">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider">Sicherheit / Passwort</h3>
-                    <div class="space-y-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-slate-400">Neues Passwort</label>
-                            <input id="acc-new-password" type="password" placeholder="Mindestens 6 Zeichen" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none dark:text-white">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
-                    <button type="button" id="btn-logout" class="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 text-rose-600 text-xs font-bold uppercase tracking-wider px-5 py-3 rounded-xl transition mr-auto">Abmelden</button>
-                    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl shadow-lg shadow-brand-600/20 transition">Änderungen speichern</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- --- APP MODES / ROUTER VIEWS --- -->
-
-    <!-- VIEW 1: DASHBOARD (STARTSEITE) -->
-    <div id="dashboard-view" class="flex-1 flex flex-col hidden animate-fadeIn">
-        <!-- Dashboard Header / Hero -->
-        <section class="py-12 px-6 sm:px-12 bg-white dark:bg-slate-800/40 border-b border-slate-200/50 dark:border-slate-800">
-            <div class="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                <div>
-                    <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white flex items-center gap-3">
-                        <span class="bg-brand-600 text-white p-2.5 rounded-2xl shadow-xl shadow-brand-600/20"><i class="fa-solid fa-chalkboard"></i></span>
-                        Mein OpenBoard Space
-                    </h1>
-                    <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">Erstelle, teile und verwalte kollaborative Pinnwände komplett kostenlos.</p>
-                </div>
-                <div class="flex items-center gap-3 self-start md:self-auto">
-                    <!-- Global Actions -->
-                    <button id="dash-btn-create-board" class="bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm px-6 py-3.5 rounded-2xl shadow-lg shadow-brand-600/25 transition flex items-center gap-2">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Board vorbereiten
-                    </button>
-                    <button id="dash-btn-auth-trigger" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm px-5 py-3.5 rounded-2xl transition flex items-center gap-2">
-                        <i class="fa-solid fa-user"></i> <span id="dash-auth-text">Anmelden</span>
-                    </button>
-                    <!-- Dark Mode Toggle -->
-                    <button id="btn-theme-toggle" class="p-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl transition"><i class="fa-solid fa-moon"></i></button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Boards Management Area -->
-        <main class="flex-1 max-w-6xl w-full mx-auto p-6 sm:p-12 space-y-8">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h2 class="text-xl font-extrabold text-slate-800 dark:text-white">Meine aktiven Pinnwände</h2>
-                <!-- Search & Filters -->
-                <div class="flex items-center gap-3 w-full sm:w-auto">
-                    <div class="relative flex-1 sm:w-64">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                        <input id="dash-search-input" type="text" placeholder="Suche nach Boards..." class="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Boards Grid -->
-            <div id="dash-boards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Dynamisch befüllt -->
-            </div>
-        </main>
-    </div>
-
-    <!-- VIEW 2: BOARD CANVAS -->
-    <div id="board-view" class="flex-1 flex flex-col hidden animate-fadeIn">
-        <header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800 px-6 py-4 sticky top-0 z-40 shadow-xs flex flex-col lg:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-4 w-full lg:w-auto">
-                <button id="btn-back-to-dash" class="p-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl transition" title="Zurück zum Dashboard">
-                    <i class="fa-solid fa-chevron-left"></i>
-                </button>
-                <div class="flex-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <h2 id="board-title-text" class="font-extrabold text-xl text-slate-900 dark:text-white">Pinnwand-Titel</h2>
-                        <span id="board-status-badge" class="text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider"></span>
-                    </div>
-                    <p id="board-description-text" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Lade Pinnwand-Details...</p>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
-                <div id="board-guest-alert" class="hidden text-xs text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/20 px-3 py-1.5 rounded-xl border border-amber-200/40 mr-2"><i class="fa-solid fa-lock"></i> Nur Lesezugriff</div>
-                
-                <button id="btn-board-settings" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition">
-                    <i class="fa-solid fa-gear"></i> Board-Einstellungen
-                </button>
-                <button id="btn-board-acc-settings" class="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden shadow-xs hover:ring-2 hover:ring-brand-500 transition">
-                    <img id="board-user-avatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=50&q=80" alt="Profile" class="w-full h-full object-cover">
-                </button>
-            </div>
-        </header>
-
-        <!-- Dynamic canvas grid scrolling horizontally -->
-        <main id="board-canvas" class="flex-1 flex gap-8 p-8 overflow-x-auto items-start select-none">
-            <!-- Dynamisch gerendert -->
-        </main>
-    </div>
-
-    <!-- --- BOARD WIZARD MODAL (CREATE BOARD) --- -->
-    <div id="board-wizard-modal" class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden max-h-[90vh]">
-            <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
-                <h2 class="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-                    <i class="fa-solid fa-wand-magic-sparkles text-brand-500"></i>
-                    Neues Board vorbereiten
-                </h2>
-                <button id="btn-close-wizard" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-
-            <form id="board-wizard-form" class="p-8 space-y-6 overflow-y-auto flex-1">
-                <div class="space-y-2">
-                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Board Titel *</label>
-                    <input id="wiz-title" type="text" required placeholder="Klasse 10b - Projektplanung" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none dark:text-white font-medium">
-                </div>
-
-                <div class="space-y-2">
-                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Beschreibung</label>
-                    <textarea id="wiz-desc" placeholder="Erklärung, Regeln oder Kurzbeschreibung..." class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none dark:text-white h-20 resize-none font-medium"></textarea>
-                </div>
-
-                <!-- Structural Templates -->
-                <div class="space-y-3">
-                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Board Struktur / Template</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <label class="border-2 border-brand-600 bg-brand-50/10 dark:bg-slate-700 p-4 rounded-2xl cursor-pointer flex items-start gap-3 transition hover:border-brand-600" id="wiz-tpl-empty">
-                            <input type="radio" name="wiz-template" value="empty" checked class="mt-1 text-brand-600 focus:ring-brand-500">
-                            <div>
-                                <span class="font-bold text-sm block text-slate-900 dark:text-white">Leeres Board</span>
-                                <span class="text-xs text-slate-500 dark:text-slate-400">Erstelle komplett eigene Spalten.</span>
-                            </div>
-                        </label>
-                        <label class="border-2 border-slate-200 dark:border-slate-700 p-4 rounded-2xl cursor-pointer flex items-start gap-3 transition hover:border-brand-600" id="wiz-tpl-kanban">
-                            <input type="radio" name="wiz-template" value="kanban" class="mt-1 text-brand-600 focus:ring-brand-500">
-                            <div>
-                                <span class="font-bold text-sm block text-slate-900 dark:text-white">Kanban</span>
-                                <span class="text-xs text-slate-500 dark:text-slate-400">Vorbereitet mit: Idee, In Arbeit, Fertig.</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Custom Wallpaper / Background Selection with File Upload support -->
-                <div class="space-y-3">
-                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Wallpaper & Hintergrund</label>
-                    <div class="grid grid-cols-3 gap-2" id="wiz-presets">
-                        <!-- Presets injected dynamically -->
-                    </div>
-                    
-                    <div class="space-y-2 mt-2">
-                        <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Eigene Hintergrundfarbe oder Wallpaper hochladen</label>
-                        <div class="flex gap-2">
-                            <input id="wiz-custom-color" type="text" placeholder="Hex-Code (z.B. #ff0055)" class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs dark:text-white focus:outline-none">
-                            <label class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1">
-                                <i class="fa-solid fa-image"></i> Bild hochladen
-                                <input id="wiz-bg-upload" type="file" accept="image/*" class="hidden">
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
-                    <button type="button" id="btn-cancel-wiz" class="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition">Abbrechen</button>
-                    <button type="submit" class="px-6 py-3 text-xs font-bold uppercase tracking-wider text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-lg shadow-brand-600/20 transition">Board anlegen</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- --- DETAILED BOARD SETTINGS MODAL --- -->
-    <div id="board-settings-modal" class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden max-h-[90vh]">
-            <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
-                <h2 class="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-                    <i class="fa-solid fa-gears text-brand-500"></i>
-                    Board-Einstellungen
-                </h2>
-                <button id="btn-close-board-settings" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-slate-400 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-
-            <form id="board-settings-form" class="p-8 space-y-6 overflow-y-auto flex-1">
-                <div class="space-y-4">
-                    <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider">Allgemein</h3>
-                    <div class="space-y-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-slate-500 dark:text-slate-400">Board Titel</label>
-                            <input id="set-board-title" type="text" required class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none dark:text-white font-medium">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-slate-500 dark:text-slate-400">Beschreibung</label>
-                            <textarea id="set-board-desc" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none dark:text-white h-20 resize-none font-medium"></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider">Sicherheit & Zugriffsrechte</h3>
-                    <div class="space-y-3">
-                        <div class="flex items-center justify-between bg-slate-50 dark:bg-slate-700/30 p-3.5 rounded-xl">
-                            <div>
-                                <label class="text-sm font-bold text-slate-800 dark:text-white block">Gäste dürfen schreiben</label>
-                                <span class="text-xs text-slate-400">Anonyme Besucher können Kärtchen erstellen & kommentieren</span>
-                            </div>
-                            <input id="set-board-public-write" type="checkbox" class="w-5 h-5 accent-brand-500">
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-slate-500 dark:text-slate-400">Board-Passwort aktivieren (optional)</label>
-                            <input id="set-board-password" type="password" placeholder="Passwort für Besucher" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none dark:text-white">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <h3 class="font-bold text-xs text-slate-400 uppercase tracking-wider">Hintergrund & Style</h3>
-                    <div class="space-y-3">
-                        <div class="grid grid-cols-2 gap-2" id="set-bg-selector">
-                            <!-- Injected dynamically -->
-                        </div>
-                        <div class="flex gap-2">
-                            <input id="set-board-custom-color" type="text" placeholder="Hex-Farbe" class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs dark:text-white focus:outline-none">
-                            <label class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1">
-                                <i class="fa-solid fa-image"></i> Bild hochladen
-                                <input id="set-bg-upload" type="file" accept="image/*" class="hidden">
-                            </label>
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-slate-500 dark:text-slate-400">Standard-Kärtchenfarbe</label>
-                            <select id="set-board-default-color" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none dark:text-white font-medium">
-                                <option value="bg-white">Standard (Weiß)</option>
-                                <option value="bg-amber-50">Gelb</option>
-                                <option value="bg-rose-50">Rot</option>
-                                <option value="bg-emerald-50">Grün</option>
-                                <option value="bg-sky-50">Blau</option>
-                                <option value="bg-purple-50">Lila</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
-                    <button type="button" id="btn-delete-board-settings" class="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 text-rose-600 text-xs font-bold uppercase tracking-wider px-5 py-3 rounded-xl transition mr-auto"><i class="fa-solid fa-trash-can mr-1.5"></i> Board löschen</button>
-                    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl shadow-lg shadow-brand-600/20 transition">Speichern</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- --- CARD DETAIL MODAL (COLLABORATIVE & MEDIA INTEGRATED) --- -->
-    <div id="card-modal" class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div id="card-modal-content" class="w-full max-w-4xl bg-white dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh] border border-slate-100 dark:border-slate-700">
-            
-            <!-- Left Side: Card Core Fields -->
-            <div class="flex-1 p-8 overflow-y-auto space-y-5">
-                <div class="flex justify-between items-center">
-                    <span class="text-[10px] font-extrabold text-brand-600 dark:text-brand-400 uppercase tracking-widest">Kärtchen anpassen</span>
-                    <div id="card-color-picker" class="flex gap-2">
-                        <!-- Colors injected dynamically -->
-                    </div>
-                </div>
-
-                <!-- Attachment preview -->
-                <div id="card-preview-container" class="hidden space-y-2">
-                    <div class="relative group rounded-2xl overflow-hidden border border-slate-200/50 dark:border-slate-700">
-                        <img id="card-image-preview" src="" alt="Anhang Vorschau" class="w-full h-48 object-cover">
-                        <button id="btn-remove-attachment" class="absolute top-3 right-3 bg-rose-600/90 text-white hover:bg-rose-700 p-2 rounded-xl transition text-xs font-bold flex items-center gap-1 shadow"><i class="fa-solid fa-trash-can"></i> Entfernen</button>
-                    </div>
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Kärtchentitel</label>
-                    <input id="edit-card-title" type="text" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none font-bold text-xl text-slate-900 dark:text-white">
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Beschreibung</label>
-                    <textarea id="edit-card-content" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm h-40 resize-none font-medium leading-relaxed dark:text-white"></textarea>
-                </div>
-
-                <!-- Media attachment block (Base64 fallback) -->
-                <div class="space-y-1">
-                    <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Anhang (Bilder oder Dokumente)</label>
-                    <div class="flex gap-2">
-                        <input id="edit-card-url" type="text" placeholder="https://beispiel.de/dokument.pdf" class="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs dark:text-white focus:outline-none">
-                        <label class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 shadow-sm">
-                            <i class="fa-solid fa-upload"></i> Upload
-                            <input id="edit-card-upload" type="file" class="hidden">
-                        </label>
-                    </div>
-                </div>
-
-                <div class="pt-4 flex justify-between items-center border-t border-slate-100 dark:border-slate-700">
-                    <button id="btn-delete-card" class="text-rose-600 hover:text-rose-700 text-xs font-bold uppercase tracking-wider flex items-center gap-2"><i class="fa-solid fa-trash-can"></i> Kärtchen löschen</button>
-                    <button id="btn-close-card" class="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-extrabold uppercase tracking-wider px-5 py-3 rounded-xl transition shadow-lg">Schließen</button>
-                </div>
-            </div>
-
-            <!-- Right Side: Realtime Discussions / Chat System -->
-            <div class="w-full md:w-96 bg-slate-50/55 dark:bg-slate-800/30 p-8 flex flex-col justify-between max-h-[40vh] md:max-h-none overflow-y-auto">
-                <div class="space-y-4 flex-1 overflow-y-auto pr-1">
-                    <h3 class="font-extrabold text-slate-800 dark:text-white flex items-center gap-2 text-base"><i class="fa-regular fa-comments text-brand-600 text-lg"></i> Diskussion</h3>
-                    <div id="comments-list" class="space-y-3 max-h-[280px] overflow-y-auto pr-1">
-                        <!-- Dynamic Comments -->
-                    </div>
-                </div>
-
-                <!-- Comment submission (Username forced from session profile) -->
-                <form id="form-comment" class="pt-4 border-t border-slate-200/60 dark:border-slate-700 space-y-3 mt-4">
-                    <div class="flex justify-between items-center text-xs text-slate-400 font-semibold">
-                        <span>Als <span id="comment-username-preview" class="text-brand-500 font-bold">@Anonym</span> kommentieren:</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <input id="comment-text-input" type="text" required placeholder="Schreibe eine Nachricht..." class="flex-1 px-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-                        <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-md"><i class="fa-solid fa-paper-plane"></i></button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-
-    <!-- --- FULL LOGICAL ARCHITECTURE (NATIVE JAVASCRIPT & SUPABASE INTEGRATION) --- -->
-    <script>
-        // --- SAFE STORAGE FALLBACK ---
+        // Sicherer Speicher-Wrapper, um SecurityErrors im Sandbox-Modus zu verhindern
         const safeStorage = {
-            getItem: (key) => { try { return localStorage.getItem(key); } catch (e) { return safeStorage._memory[key] || null; } },
-            setItem: (key, value) => { try { localStorage.setItem(key, value); } catch (e) { safeStorage._memory[key] = value; } },
-            removeItem: (key) => { try { localStorage.removeItem(key); } catch (e) { delete safeStorage._memory[key]; } },
+            getItem: (key) => {
+                try {
+                    return localStorage.getItem(key);
+                } catch (e) {
+                    console.warn("Storage-Zugriff verweigert, weiche auf Speicher aus.", e);
+                    return safeStorage._memory[key] || null;
+                }
+            },
+            setItem: (key, value) => {
+                try {
+                    localStorage.setItem(key, value);
+                } catch (e) {
+                    console.warn("Storage-Schreiben verweigert, nutze Speicher-Fallback.", e);
+                    safeStorage._memory[key] = value;
+                }
+            },
             _memory: {}
         };
 
-        // --- GLOBAL APP CONFIGURATION ---
+        // Farb-Definitionen für die Kärtchen
         const CARD_COLORS = [
             { id: 'bg-white', name: 'Standard (Weiß)', text: 'text-slate-800', border: 'border-slate-200' },
-            { id: 'bg-amber-50', name: 'Zitronengelb', text: 'text-amber-900', border: 'border-amber-200' },
-            { id: 'bg-rose-50', name: 'Pastellrot', text: 'text-rose-900', border: 'border-rose-200' },
-            { id: 'bg-emerald-50', name: 'Mintgrün', text: 'text-emerald-900', border: 'border-emerald-200' },
-            { id: 'bg-sky-50', name: 'Eisblau', text: 'text-sky-900', border: 'border-sky-200' },
-            { id: 'bg-purple-50', name: 'Flieder', text: 'text-purple-900', border: 'border-purple-200' },
+            { id: 'bg-amber-100', name: 'Gelb', text: 'text-amber-900', border: 'border-amber-200' },
+            { id: 'bg-rose-100', name: 'Rot', text: 'text-rose-900', border: 'border-rose-200' },
+            { id: 'bg-emerald-100', name: 'Grün', text: 'text-emerald-900', border: 'border-emerald-200' },
+            { id: 'bg-sky-100', name: 'Blau', text: 'text-sky-900', border: 'border-sky-200' },
+            { id: 'bg-purple-100', name: 'Lila', text: 'text-purple-900', border: 'border-purple-200' },
         ];
 
+        // Hintergrund-Gradients für das Board
         const BOARD_BACKGROUNDS = [
-            { id: 'from-blue-50 to-indigo-50', name: 'Sanftes Blau', css: 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-indigo-950' },
-            { id: 'from-emerald-50 to-teal-50', name: 'Natur-Grün', css: 'bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-teal-950' },
-            { id: 'from-rose-50 to-amber-50', name: 'Abendsonne', css: 'bg-gradient-to-br from-rose-50 to-amber-50 dark:from-slate-900 dark:to-amber-950' },
-            { id: 'from-slate-100 to-slate-200', name: 'Klassisches Grau', css: 'bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900' },
-            { id: 'from-violet-50 to-fuchsia-50', name: 'Flieder-Traum', css: 'bg-gradient-to-br from-violet-50 to-fuchsia-50 dark:from-slate-900 dark:to-fuchsia-950' }
+            { id: 'from-blue-50 to-indigo-50', name: 'Sanftes Blau', css: 'bg-gradient-to-br from-blue-50 to-indigo-50' },
+            { id: 'from-emerald-50 to-teal-50', name: 'Natur-Grün', css: 'bg-gradient-to-br from-emerald-50 to-teal-50' },
+            { id: 'from-rose-50 to-amber-50', name: 'Warmer Sonnenuntergang', css: 'bg-gradient-to-br from-rose-50 to-amber-50' },
+            { id: 'from-slate-100 to-slate-200', name: 'Klassisches Grau', css: 'bg-gradient-to-br from-slate-100 to-slate-200' },
+            { id: 'from-violet-50 to-fuchsia-50', name: 'Flieder-Traum', css: 'bg-gradient-to-br from-violet-50 to-fuchsia-50' }
         ];
 
-        const EMOPICKER_LIST = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+        function OpenBoardApp() {
+            // --- STATE-MANAGEMENT ---
+            const [supabaseUrl, setSupabaseUrl] = useState(safeStorage.getItem('ob_supabase_url') || '');
+            const [supabaseKey, setSupabaseKey] = useState(safeStorage.getItem('ob_supabase_key') || '');
+            const [dbMode, setDbMode] = useState('local'); // 'local' oder 'supabase'
+            const [supabaseClient, setSupabaseClient] = useState(null);
 
-        // --- APP STATE ---
-        let state = {
-            supabaseUrl: safeStorage.getItem('ob_supabase_url') || '',
-            supabaseKey: safeStorage.getItem('ob_supabase_key') || '',
-            dbMode: 'local',
-            supabaseClient: null,
-            userSession: null, // Holds authenticating user info
-            userProfile: { username: 'Anonym', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80' },
-            theme: safeStorage.getItem('ob_theme') || 'light',
+            // Auth States
+            const [session, setSession] = useState(null);
+            const [showAuthModal, setShowAuthModal] = useState(false);
+            const [authEmail, setAuthEmail] = useState('');
+            const [authPassword, setAuthPassword] = useState('');
+            const [isRegistering, setIsRegistering] = useState(false);
+
+            // Daten-State
+            const [boards, setBoards] = useState([]);
+            const [activeBoardId, setActiveBoardId] = useState('');
+            const [columns, setColumns] = useState([]);
+            const [cards, setCards] = useState([]);
+            const [comments, setComments] = useState([]);
+
+            // UI-States
+            const [isInitialLoading, setIsInitialLoading] = useState(true);
+            const [showSettings, setShowSettings] = useState(false);
+            const [activeCardModal, setActiveCardModal] = useState(null); // Enthält Card-Objekt, wenn offen
+            const [newBoardTitle, setNewBoardTitle] = useState('');
+            const [newColumnTitle, setNewColumnTitle] = useState('');
             
-            // Database
-            boards: [],
-            activeBoardId: '',
-            columns: [],
-            cards: [],
-            comments: [],
-            reactions: [], // Replaces simple likes
-            
-            // View / Routing state
-            activeView: 'dashboard', // 'dashboard' or 'board'
-            activeCardId: null,
-            authModalMode: 'login' // 'login' or 'register'
-        };
+            // Kommentare im Modal
+            const [commentAuthor, setCommentAuthor] = useState(safeStorage.getItem('ob_author_name') || 'Anonym');
+            const [newCommentText, setNewCommentText] = useState('');
 
-        // --- INITIAL SYSTEM HOOKS ---
-        window.addEventListener('DOMContentLoaded', async () => {
-            // Check query param for direct Board link
-            const urlParams = new URLSearchParams(window.location.search);
-            const directBoardId = urlParams.get('boardId');
-            if (directBoardId) {
-                state.activeBoardId = directBoardId;
-                state.activeView = 'board';
-            }
+            // Custom UI Notification System (Ersetzt alert() und confirm())
+            const [toast, setToast] = useState(null); // { message: string, type: 'info' | 'success' | 'error' }
+            const [confirmModal, setConfirmModal] = useState(null); // { title: string, message: string, onConfirm: fn, onCancel: fn }
 
-            // Sync Dark Theme
-            syncTheme();
+            const triggerToast = (message, type = 'info') => {
+                setToast({ message, type });
+                setTimeout(() => setToast(null), 4000);
+            };
 
-            // Connect to Supabase if configured
-            initSupabaseClient();
-            await fetchSystemSession();
-            await loadSystemData();
+            const triggerConfirm = (title, message, onConfirm) => {
+                setConfirmModal({
+                    title,
+                    message,
+                    onConfirm: () => {
+                        onConfirm();
+                        setConfirmModal(null);
+                    },
+                    onCancel: () => setConfirmModal(null)
+                });
+            };
 
-            // Setup global Event Listeners
-            setupGlobalEventListeners();
-            routeView();
-        });
+            // --- LOCAL STORAGE DATA (FALLBACK) ---
+            const getLocalData = (key, defaultVal = []) => {
+                const data = safeStorage.getItem(key);
+                return data ? JSON.parse(data) : defaultVal;
+            };
 
-        // --- THEME SYNC ---
-        function syncTheme() {
-            if (state.theme === 'dark') {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        }
+            const saveLocalData = (key, data) => {
+                safeStorage.setItem(key, JSON.stringify(data));
+            };
 
-        // --- TOAST SYSTEM ---
-        let toastTimeout;
-        function triggerToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const box = document.getElementById('toast-box');
-            const icon = document.getElementById('toast-icon');
-            const msg = document.getElementById('toast-message');
-
-            msg.textContent = message;
-            container.classList.remove('hidden');
-
-            box.className = "flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-white font-semibold text-sm transition-all duration-300 transform translate-y-0";
-            if (type === 'success') {
-                box.classList.add('bg-emerald-600');
-                icon.className = 'fa-solid fa-circle-check';
-            } else if (type === 'error') {
-                box.classList.add('bg-rose-600');
-                icon.className = 'fa-solid fa-circle-exclamation';
-            } else {
-                box.classList.add('bg-indigo-600');
-                icon.className = 'fa-solid fa-bell';
-            }
-
-            clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => { container.classList.add('hidden'); }, 4000);
-        }
-
-        // --- CONFIRMATION SYSTEM ---
-        let confirmCallback = null;
-        function triggerConfirm(title, message, onConfirm) {
-            const modal = document.getElementById('confirm-modal');
-            document.getElementById('confirm-title').textContent = title;
-            document.getElementById('confirm-message').textContent = message;
-            modal.classList.remove('hidden');
-            confirmCallback = onConfirm;
-        }
-
-        // --- VIEW ROUTER ---
-        function routeView() {
-            const dashView = document.getElementById('dashboard-view');
-            const boardView = document.getElementById('board-view');
-
-            if (state.activeView === 'dashboard') {
-                dashView.classList.remove('hidden');
-                boardView.classList.add('hidden');
-                // Remove URL parameter dynamically
-                window.history.pushState({}, '', window.location.pathname);
-            } else {
-                dashView.classList.add('hidden');
-                boardView.classList.remove('hidden');
-                // Set URL parameter dynamically
-                window.history.pushState({}, '', `?boardId=${state.activeBoardId}`);
-            }
-        }
-
-        // --- SUPABASE CLIENT CONNECT ---
-        function initSupabaseClient() {
-            if (state.supabaseUrl && state.supabaseKey) {
-                try {
-                    const loadedLoader = window.supabase || window.Supabase;
-                    if (loadedLoader) {
-                        state.supabaseClient = loadedLoader.createClient(state.supabaseUrl, state.supabaseKey);
-                        state.dbMode = 'supabase';
-                        subscribeRealtimeSub();
-                    } else {
-                        state.dbMode = 'local';
-                    }
-                } catch (e) {
-                    state.dbMode = 'local';
-                }
-            } else {
-                state.dbMode = 'local';
-            }
-        }
-
-        function subscribeRealtimeSub() {
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                state.supabaseClient
-                    .channel('schema-db-realtime-chan')
-                    .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-                        loadSystemData();
-                    })
-                    .subscribe();
-            }
-        }
-
-        // --- AUTHENTICATION & SESSIONS ---
-        async function fetchSystemSession() {
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                try {
-                    const { data: { session } } = await state.supabaseClient.auth.getSession();
-                    if (session) {
-                        state.userSession = session.user;
-                        // Fetch profile username & avatar from profiles table
-                        const { data: profile } = await state.supabaseClient.from('profiles').select('*').eq('id', session.user.id).single();
-                        if (profile) {
-                            state.userProfile = {
-                                username: profile.username || session.user.email.split('@')[0],
-                                avatar: profile.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'
-                            };
+            // --- INITIALISIERUNG DB & DATEN ---
+            useEffect(() => {
+                if (supabaseUrl && supabaseKey) {
+                    try {
+                        const globalSupabase = window.supabase || window.Supabase;
+                        if (globalSupabase) {
+                            const client = globalSupabase.createClient(supabaseUrl, supabaseKey);
+                            setSupabaseClient(client);
+                            setDbMode('supabase');
+                            triggerToast("Erfolgreich mit Supabase verbunden!", "success");
                         } else {
-                            state.userProfile = {
-                                username: session.user.email.split('@')[0],
-                                avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'
-                            };
+                            console.error("Supabase-Bibliothek im Window-Objekt fehlt.");
+                            setDbMode('local');
                         }
-                    } else {
-                        state.userSession = null;
-                        state.userProfile = { username: 'Anonym', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80' };
+                    } catch (err) {
+                        console.error("Supabase-Verbindung fehlgeschlagen:", err);
+                        setDbMode('local');
+                        triggerToast("Verbindung mit Supabase fehlgeschlagen. Lokaler Modus aktiv.", "error");
                     }
-                } catch (e) {
-                    state.userSession = null;
-                }
-            } else {
-                // Local Session check
-                const localSession = safeStorage.getItem('ob_local_session');
-                if (localSession) {
-                    state.userSession = { id: 'local-user-id', email: localSession };
-                    state.userProfile = {
-                        username: safeStorage.getItem('ob_local_username') || 'Lokaler_User',
-                        avatar: safeStorage.getItem('ob_local_avatar') || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'
-                    };
                 } else {
-                    state.userSession = null;
-                    state.userProfile = { username: 'Anonym', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80' };
+                    setDbMode('local');
                 }
-            }
-            updateSessionUI();
-        }
+            }, [supabaseUrl, supabaseKey]);
 
-        function updateSessionUI() {
-            const loginBtnText = document.getElementById('dash-auth-text');
-            const boardAvatar = document.getElementById('board-user-avatar');
-            const commentUserPreview = document.getElementById('comment-username-preview');
-
-            commentUserPreview.textContent = `@${state.userProfile.username}`;
-
-            if (state.userSession) {
-                loginBtnText.textContent = `@${state.userProfile.username}`;
-                boardAvatar.src = state.userProfile.avatar;
-            } else {
-                loginBtnText.textContent = "Anmelden";
-                boardAvatar.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80';
-            }
-        }
-
-        // --- LOAD DATABASE DATA ---
-        async function loadSystemData() {
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                try {
-                    // Fetch Boards
-                    const { data: boards } = await state.supabaseClient.from('boards').select('*').order('created_at', { ascending: false });
-                    state.boards = boards || [];
-
-                    if (state.activeBoardId) {
-                        // Fetch active board sub-elements
-                        const { data: columns } = await state.supabaseClient.from('columns').select('*').eq('board_id', state.activeBoardId).order('position', { ascending: true });
-                        state.columns = columns || [];
-
-                        const colIds = state.columns.map(c => c.id);
-                        if (colIds.length > 0) {
-                            const { data: cards } = await state.supabaseClient.from('cards').select('*').in('column_id', colIds).order('position', { ascending: true });
-                            state.cards = cards || [];
-
-                            const cardIds = state.cards.map(c => c.id);
-                            if (cardIds.length > 0) {
-                                const { data: comments } = await state.supabaseClient.from('comments').select('*').in('card_id', cardIds).order('created_at', { ascending: true });
-                                state.comments = comments || [];
-
-                                const { data: reactions } = await state.supabaseClient.from('reactions').select('*').in('card_id', cardIds);
-                                state.reactions = reactions || [];
-                            } else {
-                                state.comments = [];
-                                state.reactions = [];
-                            }
-                        } else {
-                            state.cards = [];
-                            state.comments = [];
-                            state.reactions = [];
-                        }
-                    }
-                } catch (e) {
-                    state.dbMode = 'local';
-                    loadSystemData();
-                }
-            } else {
-                // Local Mode fetch
-                state.boards = JSON.parse(safeStorage.getItem('ob_boards')) || [
-                    { id: 'board-1', title: 'Mein Willkommens-Board 🚀', description: 'Dieses Board existiert lokal. Verbinde Supabase für volle Live-Echtzeit-Fähigkeiten!', background: 'from-blue-50 to-indigo-50', public_write: true, owner_id: 'local-user-id', default_card_color: 'bg-white' }
-                ];
-                state.columns = JSON.parse(safeStorage.getItem('ob_columns')) || [
-                    { id: 'col-1', board_id: 'board-1', title: 'Brainstorming 💡', position: 0 },
-                    { id: 'col-2', board_id: 'board-1', title: 'Arbeitsphase 🛠️', position: 1 }
-                ];
-                state.cards = JSON.parse(safeStorage.getItem('ob_cards')) || [
-                    { id: 'card-1', column_id: 'col-1', title: 'Viel Spaß beim Ausprobieren!', content: 'Bilder, Links, Dateiuploads sowie Reaktionen funktionieren auch offline wunderbar.', color: 'bg-white', attachment_url: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=400&q=80', position: 0 }
-                ];
-                state.comments = JSON.parse(safeStorage.getItem('ob_comments')) || [
-                    { id: 'com-1', card_id: 'card-1', author_username: 'Entwickler', content: 'Gefällt dir das neue Dashboard?' }
-                ];
-                state.reactions = JSON.parse(safeStorage.getItem('ob_reactions')) || [
-                    { id: 're-1', card_id: 'card-1', user_id: 'local-user-id', emoji: '❤️' }
-                ];
-            }
-
-            renderDashboard();
-            renderBoardCanvas();
-        }
-
-        // --- RENDER DASHBOARD ---
-        function renderDashboard() {
-            const grid = document.getElementById('dash-boards-grid');
-            grid.innerHTML = '';
-
-            const searchVal = document.getElementById('dash-search-input').value.toLowerCase();
-            const filtered = state.boards.filter(b => b.title.toLowerCase().includes(searchVal) || (b.description && b.description.toLowerCase().includes(searchVal)));
-
-            filtered.forEach(board => {
-                const bgObj = BOARD_BACKGROUNDS.find(bg => bg.id === board.background) || BOARD_BACKGROUNDS[0];
-                const cardCount = state.cards.filter(c => state.columns.filter(col => col.board_id === board.id).map(col => col.id).includes(c.column_id)).length;
-
-                const div = document.createElement('div');
-                div.className = "p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between gap-4 group";
-                div.onclick = () => openBoard(board.id);
-
-                div.innerHTML = `
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-start">
-                            <span class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg ${bgObj.css}"><i class="fa-solid fa-chalkboard"></i></span>
-                            ${board.owner_id === (state.userSession?.id || 'local-user-id') ? '<span class="text-[9px] font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 px-2.5 py-1 rounded-full"><i class="fa-solid fa-crown mr-1"></i>Besitzer</span>' : ''}
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-lg text-slate-800 dark:text-white leading-snug group-hover:text-brand-500 transition">${board.title}</h3>
-                            <p class="text-xs text-slate-400 dark:text-slate-500 line-clamp-2 mt-1 leading-relaxed">${board.description || 'Keine Beschreibung'}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between border-t border-slate-100 dark:border-slate-700/60 pt-4 text-xs font-bold text-slate-400 dark:text-slate-500">
-                        <span>${cardCount} Kärtchen</span>
-                        <span class="text-brand-500 group-hover:translate-x-1 transition flex items-center gap-1">Öffnen <i class="fa-solid fa-arrow-right"></i></span>
-                    </div>
-                `;
-                grid.appendChild(div);
-            });
-
-            if (filtered.length === 0) {
-                grid.innerHTML = `
-                    <div class="col-span-full py-16 text-center text-slate-400 dark:text-slate-600 space-y-3">
-                        <i class="fa-solid fa-folder-open text-4xl"></i>
-                        <p class="font-semibold">Keine Pinnwände gefunden. Erstelle jetzt dein erstes Board!</p>
-                    </div>
-                `;
-            }
-        }
-
-        // --- RENDER BOARD CANVAS ---
-        function renderBoardCanvas() {
-            const canvas = document.getElementById('board-canvas');
-            canvas.innerHTML = '';
-
-            const board = state.boards.find(b => b.id === state.activeBoardId);
-            if (!board) return;
-
-            // Set Title & Description
-            document.getElementById('board-title-text').textContent = board.title;
-            document.getElementById('board-description-text').textContent = board.description || 'Kollaboratives Board';
-
-            // Check permissions & Set Badge
-            const badge = document.getElementById('board-status-badge');
-            const guestAlert = document.getElementById('board-guest-alert');
-            const isOwner = board.owner_id === (state.userSession?.id || 'local-user-id');
-            const canWrite = isOwner || board.public_write;
-
-            if (isOwner) {
-                badge.className = "text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600";
-                badge.innerHTML = `<i class="fa-solid fa-crown mr-1"></i>Besitzer`;
-                guestAlert.classList.add('hidden');
-            } else if (board.public_write) {
-                badge.className = "text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600";
-                badge.innerHTML = `<i class="fa-solid fa-pen-fancy mr-1"></i>Editierbar`;
-                guestAlert.classList.add('hidden');
-            } else {
-                badge.className = "text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-amber-50 dark:bg-amber-950/40 text-amber-600";
-                badge.innerHTML = `<i class="fa-solid fa-eye mr-1"></i>Schreibgeschützt`;
-                guestAlert.classList.remove('hidden');
-            }
-
-            // Set Board Wallpaper
-            if (board.custom_bg_val) {
-                if (board.custom_bg_val.startsWith('#') || board.custom_bg_val.startsWith('rgb')) {
-                    document.body.style.background = board.custom_bg_val;
-                    document.body.style.backgroundImage = '';
-                } else {
-                    document.body.style.backgroundImage = `url('${board.custom_bg_val}')`;
-                    document.body.className = "text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-all duration-300 board-bg-cover";
-                }
-            } else {
-                document.body.style.backgroundImage = '';
-                document.body.style.background = '';
-                const bgConfig = BOARD_BACKGROUNDS.find(bg => bg.id === board.background) || BOARD_BACKGROUNDS[0];
-                document.body.className = `text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-all duration-300 bg-gradient-to-br ${bgConfig.css}`;
-            }
-
-            // Render columns
-            const filteredCols = state.columns.filter(c => c.board_id === board.id).sort((a, b) => a.position - b.position);
-            filteredCols.forEach(col => {
-                const colCards = state.cards.filter(c => c.column_id === col.id).sort((a,b) => a.position - b.position);
-                const colDiv = document.createElement('div');
-                colDiv.className = "w-80 shrink-0 bg-white/70 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200/40 dark:border-slate-700/60 rounded-3xl flex flex-col max-h-[calc(100vh-160px)] shadow-lg";
-
-                let cardsHTML = '';
-                colCards.forEach((card, idx) => {
-                    // Reactions Summary Grouping
-                    const cardReactions = state.reactions.filter(re => re.card_id === card.id);
-                    const isMedia = card.attachment_url && card.attachment_url.match(/\.(jpeg|jpg|gif|png|webp|svg)/i);
-
-                    let mediaPreview = isMedia ? `
-                        <img src="${card.attachment_url}" class="w-full h-36 object-cover rounded-2xl mb-2" alt="Anhang">
-                    ` : '';
-
-                    let attachmentBadge = card.attachment_url && !isMedia ? `
-                        <a href="${card.attachment_url}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-700 p-2 rounded-xl text-brand-600 dark:text-brand-400 font-bold self-start mt-1 hover:underline"><i class="fa-solid fa-arrow-up-right-from-square"></i> Link öffnen</a>
-                    ` : '';
-
-                    // Sort arrows for Owner
-                    const arrowUp = idx > 0 && isOwner ? `<button onclick="event.stopPropagation(); shiftCardPos('${card.id}', 'up')" class="p-1 text-slate-400 hover:text-brand-500 rounded"><i class="fa-solid fa-arrow-up text-[10px]"></i></button>` : '';
-                    const arrowDown = idx < colCards.length - 1 && isOwner ? `<button onclick="event.stopPropagation(); shiftCardPos('${card.id}', 'down')" class="p-1 text-slate-400 hover:text-brand-500 rounded"><i class="fa-solid fa-arrow-down text-[10px]"></i></button>` : '';
-
-                    // Group identical reactions together
-                    const counts = {};
-                    cardReactions.forEach(r => { counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
-                    
-                    let rxSummary = '';
-                    Object.keys(counts).forEach(em => {
-                        const hasMyRx = cardReactions.some(r => r.emoji === em && r.user_id === (state.userSession?.id || 'local-user-id'));
-                        rxSummary += `
-                            <span onclick="event.stopPropagation(); toggleSpecificReaction('${card.id}', '${em}')" class="px-2.5 py-1 rounded-lg text-xs font-bold border cursor-pointer transition ${hasMyRx ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200/40 dark:border-slate-600/40 text-slate-600 dark:text-slate-400'}">
-                                ${em} ${counts[em]}
-                            </span>
-                        `;
+            // Supabase Auth Listener
+            useEffect(() => {
+                if (dbMode === 'supabase' && supabaseClient) {
+                    // Aktuelle Session abrufen
+                    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+                        setSession(session);
                     });
 
-                    cardsHTML += `
-                        <div class="p-5 rounded-2xl shadow-sm border border-slate-200/40 dark:border-slate-700/60 cursor-pointer relative group ${card.color || 'bg-white dark:bg-slate-800'} hover:shadow-xl transition duration-300" onclick="openCardDetailsModal('${card.id}')">
-                            <div class="flex justify-between items-start gap-1">
-                                <h4 class="font-extrabold text-slate-900 dark:text-white leading-tight flex-1 text-sm">${card.title}</h4>
-                                <div class="hidden group-hover:flex items-center gap-0.5 bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-100 p-0.5 rounded-lg">${arrowUp}${arrowDown}</div>
-                            </div>
-                            ${mediaPreview}
-                            <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium mt-1 line-clamp-4 whitespace-pre-wrap">${card.content || ''}</p>
-                            ${attachmentBadge}
-                            
-                            <!-- Reaction triggers -->
-                            <div class="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-slate-700/60 pt-3 mt-3">
-                                <div class="relative group/em" onclick="event.stopPropagation()">
-                                    <button class="w-7 h-7 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 rounded-full flex items-center justify-center text-slate-400 hover:text-brand-500 transition text-xs shadow-xs"><i class="fa-regular fa-face-smile"></i></button>
-                                    
-                                    <!-- Reaction Hover Picker -->
-                                    <div class="absolute bottom-full left-0 mb-2 bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700 p-1.5 rounded-2xl shadow-xl hidden group-hover/em:flex gap-1.5 z-40 reaction-popover">
-                                        ${EMOPICKER_LIST.map(em => `<button onclick="toggleSpecificReaction('${card.id}', '${em}')" class="hover:scale-125 transition text-base leading-none p-1">${em}</button>`).join('')}
-                                    </div>
-                                </div>
-                                <div class="flex flex-wrap gap-1 items-center flex-1">
-                                    ${rxSummary}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
+                    // Auf Änderungen hören
+                    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+                        setSession(session);
+                    });
 
-                colDiv.innerHTML = `
-                    <div class="p-4 flex items-center justify-between border-b border-slate-200/50 dark:border-slate-700/60">
-                        <input type="text" class="font-extrabold text-slate-800 dark:text-white bg-transparent border-b border-transparent hover:border-slate-300 focus:border-brand-500 focus:outline-none rounded px-1 w-48 py-0.5" value="${col.title}" ${!canWrite ? 'disabled' : ''} onblur="renameColumnCanvas('${col.id}', this.value)">
-                        ${canWrite ? `
-                            <div class="flex items-center gap-1 text-slate-400">
-                                <button onclick="addNewCard('${col.id}')" class="p-1.5 hover:text-brand-500 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition" title="Kärtchen hinzufügen"><i class="fa-solid fa-plus"></i></button>
-                                <button onclick="removeColumnCanvas('${col.id}')" class="p-1.5 hover:text-rose-500 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition" title="Spalte löschen"><i class="fa-solid fa-trash-can"></i></button>
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div class="p-4 overflow-y-auto flex flex-col gap-4 flex-1">
-                        ${cardsHTML || `<div class="text-center py-10 text-slate-400 dark:text-slate-600 text-xs"><i class="fa-regular fa-clipboard text-xl mb-1.5 block"></i>Keine Kärtchen</div>`}
-                    </div>
-                    ${canWrite ? `
-                        <div class="p-4 border-t border-slate-200/50 dark:border-slate-700/60">
-                            <button onclick="addNewCard('${col.id}')" class="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-brand-600 dark:text-brand-400 border border-slate-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs transition">
-                                <i class="fa-solid fa-plus"></i> Kärtchen hinzufügen
-                            </button>
-                        </div>
-                    ` : ''}
-                `;
-                canvas.appendChild(colDiv);
-            });
+                    return () => subscription.unsubscribe();
+                }
+            }, [dbMode, supabaseClient]);
 
-            // Wizard column creator for editors
-            if (canWrite) {
-                const addColDiv = document.createElement('div');
-                addColDiv.className = "w-80 shrink-0 bg-white/30 dark:bg-slate-800/30 border-2 border-dashed border-slate-300/60 dark:border-slate-700/60 rounded-3xl p-5 flex flex-col gap-4 backdrop-blur-xs";
-                addColDiv.innerHTML = `
-                    <h4 class="font-extrabold text-slate-700 dark:text-slate-300 text-sm">Neue Spalte einfügen</h4>
-                    <input id="board-col-wizard-input" type="text" placeholder="Titel der Spalte..." class="px-4 py-3 bg-white/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-brand-500 focus:outline-none dark:text-white">
-                    <button onclick="createColumnCanvas()" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold uppercase tracking-wider py-3 rounded-xl shadow-md transition">Spalte anlegen</button>
-                `;
-                canvas.appendChild(addColDiv);
-            }
-        }
+            // Laden der Daten basierend auf dem Modus
+            useEffect(() => {
+                const loadData = async () => {
+                    setIsInitialLoading(true);
+                    if (dbMode === 'supabase' && supabaseClient) {
+                        await fetchFromSupabase();
+                    } else {
+                        // LocalStorage Fallback Daten
+                        const localBoards = getLocalData('ob_boards', [
+                            { id: 'board-1', title: 'Willkommens-Board 🚀', description: 'Dein erstes OpenBoard. Du kannst dieses bearbeiten oder neue erstellen!', background: 'from-blue-50 to-indigo-50' }
+                        ]);
+                        const localColumns = getLocalData('ob_columns', [
+                            { id: 'col-1', board_id: 'board-1', title: 'Zu Erledigen 📝', position: 0 },
+                            { id: 'col-2', board_id: 'board-1', title: 'In Arbeit 🛠️', position: 1 },
+                            { id: 'col-3', board_id: 'board-1', title: 'Fertig 🎉', position: 2 }
+                        ]);
+                        const localCards = getLocalData('ob_cards', [
+                            { id: 'card-1', column_id: 'col-1', title: 'Willkommen bei OpenBoard!', content: 'Das ist ein Kärtchen. Klicke auf mich, um Kommentare zu lesen, Anhänge zu öffnen oder mich zu editieren!', color: 'bg-amber-100', attachment_url: 'https://github.com', likes: 2, position: 0 }
+                        ]);
+                        const localComments = getLocalData('ob_comments', [
+                            { id: 'com-1', card_id: 'card-1', author: 'Entwickler', content: 'Klasse, dass du dich für Open-Source entscheidest!' }
+                        ]);
 
-        // --- CORE LOGICAL OPERATIONS (BOARD ACTIONS) ---
-        function openBoard(id) {
-            state.activeBoardId = id;
-            state.activeView = 'board';
-            loadSystemData();
-            routeView();
-        }
+                        setBoards(localBoards);
+                        setColumns(localColumns);
+                        setCards(localCards);
+                        setComments(localComments);
 
-        // Create Board on Wizard Submit
-        async function handleBoardWizardSubmit(event) {
-            event.preventDefault();
-            const title = document.getElementById('wiz-title').value.trim();
-            const desc = document.getElementById('wiz-desc').value.trim();
-            const template = document.querySelector('input[name="wiz-template"]:checked').value;
+                        if (localBoards.length > 0 && !activeBoardId) {
+                            setActiveBoardId(localBoards[0].id);
+                        }
+                    }
+                    setIsInitialLoading(false);
+                };
 
-            let background = 'from-blue-50 to-indigo-50';
-            let custom_bg_val = '';
+                loadData();
+            }, [dbMode, supabaseClient]);
 
-            const selectedPreset = document.querySelector('.wiz-preset-active');
-            if (selectedPreset) background = selectedPreset.dataset.id;
+            // Realtime Subscription bei Supabase aktivieren
+            useEffect(() => {
+                if (dbMode === 'supabase' && supabaseClient && activeBoardId) {
+                    const channel = supabaseClient
+                        .channel('schema-db-changes')
+                        .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+                            fetchFromSupabase();
+                        })
+                        .subscribe();
 
-            const customColor = document.getElementById('wiz-custom-color').value.trim();
-            if (customColor) custom_bg_val = customColor;
+                    return () => {
+                        supabaseClient.removeChannel(channel);
+                    };
+                }
+            }, [dbMode, supabaseClient, activeBoardId]);
 
-            const newB = {
-                title,
-                description: desc,
-                background,
-                custom_bg_val,
-                public_write: true,
-                default_card_color: 'bg-white',
-                owner_id: state.userSession?.id || 'local-user-id'
+            const fetchFromSupabase = async () => {
+                if (!supabaseClient) return;
+                try {
+                    const { data: boardsData, error: bErr } = await supabaseClient.from('boards').select('*').order('created_at', { ascending: true });
+                    if (bErr) throw bErr;
+                    setBoards(boardsData);
+
+                    let currentBoard = activeBoardId;
+                    if (boardsData.length > 0 && !currentBoard) {
+                        currentBoard = boardsData[0].id;
+                        setActiveBoardId(currentBoard);
+                    }
+
+                    if (currentBoard) {
+                        const { data: columnsData, error: cErr } = await supabaseClient.from('columns').select('*').eq('board_id', currentBoard).order('position', { ascending: true });
+                        if (cErr) throw cErr;
+                        setColumns(columnsData);
+
+                        const columnIds = columnsData.map(col => col.id);
+
+                        if (columnIds.length > 0) {
+                            const { data: cardsData, error: cardErr } = await supabaseClient.from('cards').select('*').in('column_id', columnIds).order('position', { ascending: true });
+                            if (cardErr) throw cardErr;
+                            setCards(cardsData);
+
+                            const cardIds = cardsData.map(c => c.id);
+                            if (cardIds.length > 0) {
+                                const { data: commentsData, error: comErr } = await supabaseClient.from('comments').select('*').in('card_id', cardIds).order('created_at', { ascending: true });
+                                if (comErr) throw comErr;
+                                setComments(commentsData);
+                            } else {
+                                setComments([]);
+                            }
+                        } else {
+                            setCards([]);
+                            setComments([]);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Fehler beim Laden von Supabase:", err);
+                }
             };
 
-            let generatedBoardId = '';
+            // --- AUTH LOGIK ---
+            const handleAuth = async (e) => {
+                e.preventDefault();
+                if (!authEmail || !authPassword) return;
 
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                const { data, error } = await state.supabaseClient.from('boards').insert([newB]).select();
-                if (error) {
-                    triggerToast("Fehler beim Cloud-Speichern", "error");
+                if (dbMode === 'supabase' && supabaseClient) {
+                    try {
+                        if (isRegistering) {
+                            const { error } = await supabaseClient.auth.signUp({
+                                email: authEmail,
+                                password: authPassword,
+                            });
+                            if (error) throw error;
+                            triggerToast("Registrierung erfolgreich! Bitte überprüfe dein E-Mail-Postfach zur Bestätigung.", "success");
+                        } else {
+                            const { error } = await supabaseClient.auth.signInWithPassword({
+                                email: authEmail,
+                                password: authPassword,
+                            });
+                            if (error) throw error;
+                            triggerToast("Erfolgreich angemeldet!", "success");
+                        }
+                        setShowAuthModal(false);
+                    } catch (err) {
+                        triggerToast(err.message, "error");
+                    }
+                } else {
+                    // Lokale Fallback-Sitzung
+                    setSession({ user: { email: authEmail } });
+                    triggerToast(isRegistering ? "Lokaler Test-Account registriert!" : "Erfolgreich lokal angemeldet!", "success");
+                    setShowAuthModal(false);
+                }
+            };
+
+            const handleLogout = async () => {
+                if (dbMode === 'supabase' && supabaseClient) {
+                    await supabaseClient.auth.signOut();
+                } else {
+                    setSession(null);
+                }
+                triggerToast("Erfolgreich abgemeldet.", "info");
+            };
+
+            // --- BOARD CRUD ---
+            const createBoard = async () => {
+                // Prüfen ob eingeloggt
+                if (!session) {
+                    triggerToast("Du musst angemeldet sein, um ein neues Board zu erstellen!", "error");
+                    setShowAuthModal(true);
                     return;
                 }
-                generatedBoardId = data[0].id;
-            } else {
-                generatedBoardId = 'board-' + Date.now();
-                const updated = [...state.boards, { ...newB, id: generatedBoardId }];
-                state.boards = updated;
-                safeStorage.setItem('ob_boards', JSON.stringify(updated));
-            }
 
-            // Prefill structural templates
-            const columnsToAdd = [];
-            if (template === 'kanban') {
-                columnsToAdd.push('Brainstorming 💡', 'In Arbeit 🛠️', 'Erfolgreich 🎉');
-            }
-
-            for (let i = 0; i < columnsToAdd.length; i++) {
-                const colObj = { board_id: generatedBoardId, title: columnsToAdd[i], position: i };
-                if (state.dbMode === 'supabase' && state.supabaseClient) {
-                    await state.supabaseClient.from('columns').insert([colObj]);
-                } else {
-                    state.columns.push({ ...colObj, id: `col-${Date.now()}-${i}` });
-                }
-            }
-
-            if (state.dbMode === 'local') {
-                safeStorage.setItem('ob_columns', JSON.stringify(state.columns));
-            }
-
-            document.getElementById('board-wizard-modal').classList.add('hidden');
-            openBoard(generatedBoardId);
-            triggerToast("Board erfolgreich vorbereitet!", "success");
-        }
-
-        // Create Column Canvas
-        async function createColumnCanvas() {
-            const input = document.getElementById('board-col-wizard-input');
-            const title = input.value.trim();
-            if (!title) return;
-
-            const nextPos = state.columns.filter(c => c.board_id === state.activeBoardId).length;
-            const newCol = { board_id: state.activeBoardId, title, position: nextPos };
-
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                await state.supabaseClient.from('columns').insert([newCol]);
-                await loadSystemData();
-            } else {
-                state.columns.push({ ...newCol, id: 'col-' + Date.now() });
-                safeStorage.setItem('ob_columns', JSON.stringify(state.columns));
-                await loadSystemData();
-            }
-            input.value = '';
-        }
-
-        // Rename Column
-        async function renameColumnCanvas(colId, value) {
-            if (!value.trim()) return;
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                await state.supabaseClient.from('columns').update({ title: value }).eq('id', colId);
-                await loadSystemData();
-            } else {
-                state.columns = state.columns.map(c => c.id === colId ? { ...c, title: value } : c);
-                safeStorage.setItem('ob_columns', JSON.stringify(state.columns));
-                renderBoardCanvas();
-            }
-        }
-
-        // Remove Column Canvas
-        function removeColumnCanvas(colId) {
-            triggerConfirm("Spalte löschen?", "Möchtest du diese Spalte mitsamt allen Kärtchen unwiderruflich löschen?", async () => {
-                if (state.dbMode === 'supabase' && state.supabaseClient) {
-                    await state.supabaseClient.from('columns').delete().eq('id', colId);
-                    await loadSystemData();
-                } else {
-                    state.columns = state.columns.filter(c => c.id !== colId);
-                    state.cards = state.cards.filter(c => c.column_id !== colId);
-                    safeStorage.setItem('ob_columns', JSON.stringify(state.columns));
-                    safeStorage.setItem('ob_cards', JSON.stringify(state.cards));
-                    await loadSystemData();
-                }
-                triggerToast("Spalte gelöscht", "info");
-            });
-        }
-
-        // Add Card
-        async function addNewCard(columnId) {
-            const board = state.boards.find(b => b.id === state.activeBoardId);
-            const defaultCol = board?.default_card_color || 'bg-white';
-
-            const newCard = {
-                column_id: columnId,
-                title: 'Neues Kärtchen',
-                content: 'Hier klicken zum Editieren...',
-                color: defaultCol,
-                attachment_url: '',
-                position: state.cards.filter(c => c.column_id === columnId).length
-            };
-
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                const { data } = await state.supabaseClient.from('cards').insert([newCard]).select();
-                await loadSystemData();
-                if (data) openCardDetailsModal(data[0].id);
-            } else {
-                const localCard = { ...newCard, id: 'card-' + Date.now() };
-                state.cards.push(localCard);
-                safeStorage.setItem('ob_cards', JSON.stringify(state.cards));
-                await loadSystemData();
-                openCardDetailsModal(localCard.id);
-            }
-        }
-
-        // Shift card pos
-        async function shiftCardPos(cardId, direction) {
-            const card = state.cards.find(c => c.id === cardId);
-            if (!card) return;
-            const sbls = state.cards.filter(c => c.column_id === card.column_id).sort((a,b) => a.position - b.position);
-            const pos = sbls.findIndex(s => s.id === cardId);
-
-            if (direction === 'up' && pos > 0) {
-                const other = sbls[pos - 1];
-                await updateCardField(card.id, { position: other.position });
-                await updateCardField(other.id, { position: card.position });
-            } else if (direction === 'down' && pos < sbls.length - 1) {
-                const other = sbls[pos + 1];
-                await updateCardField(card.id, { position: other.position });
-                await updateCardField(other.id, { position: card.position });
-            }
-            await loadSystemData();
-        }
-
-        async function updateCardField(cardId, fields) {
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                await state.supabaseClient.from('cards').update(fields).eq('id', cardId);
-            } else {
-                state.cards = state.cards.map(c => c.id === cardId ? { ...c, ...fields } : c);
-                safeStorage.setItem('ob_cards', JSON.stringify(state.cards));
-            }
-        }
-
-        // --- EMOPICKER / REACTION SYSTEM ---
-        async function toggleSpecificReaction(cardId, emoji) {
-            const myUserId = state.userSession?.id || 'local-user-id';
-            const existing = state.reactions.find(r => r.card_id === cardId && r.user_id === myUserId && r.emoji === emoji);
-
-            if (existing) {
-                // Delete Reaction
-                if (state.dbMode === 'supabase' && state.supabaseClient) {
-                    await state.supabaseClient.from('reactions').delete().eq('id', existing.id);
-                } else {
-                    state.reactions = state.reactions.filter(r => r.id !== existing.id);
-                    safeStorage.setItem('ob_reactions', JSON.stringify(state.reactions));
-                }
-            } else {
-                // Add Reaction
-                const rx = { card_id: cardId, user_id: myUserId, emoji };
-                if (state.dbMode === 'supabase' && state.supabaseClient) {
-                    await state.supabaseClient.from('reactions').insert([rx]);
-                } else {
-                    state.reactions.push({ ...rx, id: 're-' + Date.now() });
-                    safeStorage.setItem('ob_reactions', JSON.stringify(state.reactions));
-                }
-            }
-            await loadSystemData();
-        }
-
-        // --- CARD MODAL DETAILS ---
-        function openCardDetailsModal(cardId) {
-            state.activeCardId = cardId;
-            const card = state.cards.find(c => c.id === cardId);
-            if (!card) return;
-
-            document.getElementById('edit-card-title').value = card.title;
-            document.getElementById('edit-card-content').value = card.content || '';
-            document.getElementById('edit-card-url').value = card.attachment_url || '';
-
-            // Handle preview container
-            const pCont = document.getElementById('card-preview-container');
-            const pImg = document.getElementById('card-image-preview');
-            const isMedia = card.attachment_url && card.attachment_url.match(/\.(jpeg|jpg|gif|png|webp|svg)/i);
-
-            if (isMedia) {
-                pImg.src = card.attachment_url;
-                pCont.classList.remove('hidden');
-            } else {
-                pCont.classList.add('hidden');
-            }
-
-            // Colors Picker
-            const picker = document.getElementById('card-color-picker');
-            picker.innerHTML = '';
-            CARD_COLORS.forEach(c => {
-                const btn = document.createElement('button');
-                btn.className = `w-6 h-6 rounded-full border cursor-pointer transition-all ${c.id} ${card.color === c.id ? 'border-slate-800 dark:border-white ring-4 ring-slate-200 dark:ring-slate-700' : 'border-slate-300'}`;
-                btn.onclick = async () => {
-                    await updateCardField(cardId, { color: c.id });
-                    await loadSystemData();
-                    openCardDetailsModal(cardId);
+                if (!newBoardTitle.trim()) return;
+                const newBoard = {
+                    title: newBoardTitle,
+                    description: 'Eine neue Pinnwand',
+                    background: 'from-blue-50 to-indigo-50',
+                    owner_id: session.user.id || null
                 };
-                picker.appendChild(btn);
-            });
 
-            // Render comments
-            renderCommentsDetails(cardId);
-
-            document.getElementById('card-modal').classList.remove('hidden');
-        }
-
-        function renderCommentsDetails(cardId) {
-            const container = document.getElementById('comments-list');
-            container.innerHTML = '';
-
-            const filtered = state.comments.filter(com => com.card_id === cardId).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-            filtered.forEach(com => {
-                const div = document.createElement('div');
-                div.className = "bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-xs text-xs space-y-1";
-                div.innerHTML = `
-                    <div class="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                        <span>@${com.author_username}</span>
-                        <span>${new Date(com.created_at || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                    </div>
-                    <p class="text-slate-600 dark:text-slate-300 font-medium leading-relaxed">${com.content}</p>
-                `;
-                container.appendChild(div);
-            });
-
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="text-center py-8 text-slate-400 dark:text-slate-600 text-xs font-semibold">Keine Kommentare vorhanden.</div>`;
-            }
-        }
-
-        async function submitDiscussionComment(event) {
-            event.preventDefault();
-            const text = document.getElementById('comment-text-input').value.trim();
-            if (!text || !state.activeCardId) return;
-
-            const com = {
-                card_id: state.activeCardId,
-                author_username: state.userProfile.username,
-                content: text
-            };
-
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                await state.supabaseClient.from('comments').insert([com]);
-            } else {
-                state.comments.push({ ...com, id: 'com-' + Date.now(), created_at: new Date().toISOString() });
-                safeStorage.setItem('ob_comments', JSON.stringify(state.comments));
-            }
-
-            document.getElementById('comment-text-input').value = '';
-            await loadSystemData();
-            renderCommentsDetails(state.activeCardId);
-        }
-
-        // Delete Card
-        function deleteCardDetails() {
-            triggerConfirm("Kärtchen löschen?", "Möchtest du diese Notizkarte wirklich entfernen?", async () => {
-                if (state.dbMode === 'supabase' && state.supabaseClient) {
-                    await state.supabaseClient.from('cards').delete().eq('id', state.activeCardId);
-                } else {
-                    state.cards = state.cards.filter(c => c.id !== state.activeCardId);
-                    state.comments = state.comments.filter(com => com.card_id !== state.activeCardId);
-                    safeStorage.setItem('ob_cards', JSON.stringify(state.cards));
-                    safeStorage.setItem('ob_comments', JSON.stringify(state.comments));
-                }
-                document.getElementById('card-modal').classList.add('hidden');
-                await loadSystemData();
-                triggerToast("Kärtchen gelöscht", "info");
-            });
-        }
-
-        // --- ACCOUNT UPDATE ---
-        async function handleAccountSubmit(event) {
-            event.preventDefault();
-            const newUsername = document.getElementById('acc-new-username').value.trim();
-            const newEmail = document.getElementById('acc-new-email').value.trim();
-            const newPassword = document.getElementById('acc-new-password').value.trim();
-
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                try {
-                    const profileData = {};
-                    const authData = {};
-
-                    if (newUsername) profileData.username = newUsername;
-                    if (newEmail) authData.email = newEmail;
-                    if (newPassword) authData.password = newPassword;
-
-                    // Update Auth if needed
-                    if (Object.keys(authData).length > 0) {
-                        const { error } = await state.supabaseClient.auth.updateUser(authData);
-                        if (error) throw error;
-                    }
-
-                    // Update Profile if needed
-                    if (Object.keys(profileData).length > 0) {
-                        const { error } = await state.supabaseClient.from('profiles').update(profileData).eq('id', state.userSession.id);
-                        if (error) throw error;
-                    }
-
-                    triggerToast("Account-Daten erfolgreich aktualisiert!", "success");
-                } catch (e) {
-                    triggerToast(e.message, "error");
-                }
-            } else {
-                // Local Mode Updates
-                if (newUsername) {
-                    state.userProfile.username = newUsername;
-                    safeStorage.setItem('ob_local_username', newUsername);
-                }
-                if (newEmail) {
-                    state.userSession.email = newEmail;
-                    safeStorage.setItem('ob_local_session', newEmail);
-                }
-                triggerToast("Lokaler Account aktualisiert!", "success");
-            }
-            document.getElementById('account-modal').classList.add('hidden');
-            await fetchSystemSession();
-        }
-
-        // --- DUAL MODE STORAGE/UPLOAD (IMAGES & FILE UPLOADS) ---
-        async function handleFileUpload(file, targetType, targetId = null) {
-            // targetType: 'avatar', 'wallpaper-wiz', 'wallpaper-settings', 'card-attachment'
-            triggerToast("Lade Datei hoch...", "info");
-
-            let resultUrl = '';
-
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                try {
-                    // Unique file name mapping
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-                    const filePath = `uploads/${fileName}`;
-
-                    // Upload into Storage Bucket 'openboard-assets'
-                    const { data, error } = await state.supabaseClient.storage.from('openboard-assets').upload(filePath, file);
-                    if (error) throw error;
-
-                    const { data: { publicUrl } } = state.supabaseClient.storage.from('openboard-assets').getPublicUrl(filePath);
-                    resultUrl = publicUrl;
-                } catch (e) {
-                    // Fallback into Base64 compress if bucket is not accessible or not configured
-                    resultUrl = await compressFileToBase64(file);
-                }
-            } else {
-                // Offline Local compress Base64 file parsing
-                resultUrl = await compressFileToBase64(file);
-            }
-
-            // Apply modifications based on target context
-            if (targetType === 'avatar') {
-                document.getElementById('acc-avatar-preview').src = resultUrl;
-                if (state.dbMode === 'supabase') {
-                    await state.supabaseClient.from('profiles').update({ avatar_url: resultUrl }).eq('id', state.userSession.id);
-                } else {
-                    safeStorage.setItem('ob_local_avatar', resultUrl);
-                }
-                await fetchSystemSession();
-            } else if (targetType === 'wallpaper-wiz') {
-                document.getElementById('wiz-custom-color').value = resultUrl;
-                triggerToast("Wallpaper hochgeladen!", "success");
-            } else if (targetType === 'wallpaper-settings') {
-                document.getElementById('set-board-custom-color').value = resultUrl;
-                triggerToast("Wallpaper hochgeladen!", "success");
-            } else if (targetType === 'card-attachment') {
-                document.getElementById('edit-card-url').value = resultUrl;
-                await updateCardField(state.activeCardId, { attachment_url: resultUrl });
-                await loadSystemData();
-                openCardDetailsModal(state.activeCardId);
-                triggerToast("Anhang erfolgreich hochgeladen!", "success");
-            }
-        }
-
-        function compressFileToBase64(file) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result);
-            });
-        }
-
-        // --- SETTINGS PRESET WALLPAPER INJECTION ---
-        function renderSettingsPresets() {
-            const selector = document.getElementById('set-bg-selector');
-            selector.innerHTML = '';
-            BOARD_BACKGROUNDS.forEach(bg => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = `p-2.5 rounded-xl border text-[11px] font-bold text-left truncate ${bg.css} border-slate-200 dark:border-slate-700`;
-                btn.textContent = bg.name;
-                btn.onclick = () => {
-                    document.getElementById('set-board-custom-color').value = '';
-                    const board = state.boards.find(b => b.id === state.activeBoardId);
-                    if (board) board.background = bg.id;
-                };
-                selector.appendChild(btn);
-            });
-        }
-
-        // --- AUTH REGISTER/LOGIN ENGINE ---
-        async function handleAuthFormSubmit(event) {
-            event.preventDefault();
-            const email = document.getElementById('auth-email').value.trim();
-            const password = document.getElementById('auth-password').value.trim();
-            const username = document.getElementById('auth-username').value.trim();
-
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                try {
-                    if (state.authModalMode === 'register') {
-                        const { data, error } = await state.supabaseClient.auth.signUp({
-                            email,
-                            password,
-                            options: { data: { username } }
-                        });
-                        if (error) throw error;
-                        triggerToast("Registrierung erfolgreich! Bitte bestätige deine E-Mail.", "success");
+                if (dbMode === 'supabase') {
+                    const { data, error } = await supabaseClient.from('boards').insert([newBoard]).select();
+                    if (error) {
+                        console.error(error);
+                        triggerToast("Fehler beim Erstellen des Boards auf Supabase", "error");
                     } else {
-                        const { data, error } = await state.supabaseClient.auth.signInWithPassword({ email, password });
-                        if (error) throw error;
-                        triggerToast("Erfolgreich angemeldet!", "success");
+                        setActiveBoardId(data[0].id);
+                        fetchFromSupabase();
+                        triggerToast("Neues Board erfolgreich erstellt!", "success");
                     }
-                } catch (e) {
-                    triggerToast(e.message, "error");
-                }
-            } else {
-                // Local Mode Mock authentication
-                if (state.authModalMode === 'register') {
-                    safeStorage.setItem('ob_local_session', email);
-                    safeStorage.setItem('ob_local_username', username || email.split('@')[0]);
-                    triggerToast("Lokale Registrierung erfolgreich!", "success");
                 } else {
-                    safeStorage.setItem('ob_local_session', email);
-                    triggerToast("Erfolgreich angemeldet!", "success");
+                    const localNewBoard = { ...newBoard, id: 'board-' + Date.now() };
+                    const updated = [...boards, localNewBoard];
+                    setBoards(updated);
+                    saveLocalData('ob_boards', updated);
+                    setActiveBoardId(localNewBoard.id);
+                    triggerToast("Lokales Board erstellt!", "success");
                 }
-            }
-
-            document.getElementById('auth-modal').classList.add('hidden');
-            await fetchSystemSession();
-            await loadSystemData();
-        }
-
-        // --- GLOBAL EVENT LISTENERS SETUP ---
-        function setupGlobalEventListeners() {
-            // View Navigation
-            document.getElementById('btn-back-to-dash').onclick = () => {
-                state.activeView = 'dashboard';
-                state.activeBoardId = '';
-                loadSystemData();
-                routeView();
+                setNewBoardTitle('');
             };
 
-            // Dashboard Actions
-            document.getElementById('dash-btn-create-board').onclick = () => toggleWizardModal(true);
-            document.getElementById('btn-close-wizard').onclick = () => toggleWizardModal(false);
-            document.getElementById('btn-cancel-wiz').onclick = () => toggleWizardModal(false);
-            document.getElementById('board-wizard-form').onsubmit = handleBoardWizardSubmit;
-            document.getElementById('dash-search-input').oninput = renderDashboard;
-
-            // Auth trigger
-            document.getElementById('dash-btn-auth-trigger').onclick = () => {
-                if (state.userSession) {
-                    // Open Profile instead of Login
-                    openAccountSettings();
+            const updateBoardSettings = async (title, desc, bg) => {
+                if (dbMode === 'supabase') {
+                    const { error } = await supabaseClient.from('boards').update({ title, description: desc, background: bg }).eq('id', activeBoardId);
+                    if (error) console.error(error);
+                    else fetchFromSupabase();
                 } else {
-                    openAuthModal('login');
+                    const updated = boards.map(b => b.id === activeBoardId ? { ...b, title, description: desc, background: bg } : b);
+                    setBoards(updated);
+                    saveLocalData('ob_boards', updated);
                 }
             };
-            document.getElementById('btn-close-auth').onclick = () => document.getElementById('auth-modal').classList.add('hidden');
-            document.getElementById('auth-toggle-mode').onclick = () => {
-                if (state.authModalMode === 'login') openAuthModal('register');
-                else openAuthModal('login');
-            };
-            document.getElementById('auth-form').onsubmit = handleAuthFormSubmit;
 
-            // Account settings Modal
-            document.getElementById('board-user-avatar').onclick = openAccountSettings;
-            document.getElementById('btn-close-account').onclick = () => document.getElementById('account-modal').classList.add('hidden');
-            document.getElementById('account-form').onsubmit = handleAccountSubmit;
-            document.getElementById('acc-avatar-upload').onchange = (e) => handleFileUpload(e.target.files[0], 'avatar');
+            const deleteActiveBoard = () => {
+                triggerConfirm(
+                    "Board löschen?", 
+                    "Möchtest du dieses Board wirklich mitsamt allen Spalten und Kärtchen unwiderruflich löschen?",
+                    async () => {
+                        if (dbMode === 'supabase') {
+                            const { error } = await supabaseClient.from('boards').delete().eq('id', activeBoardId);
+                            if (error) {
+                                console.error(error);
+                                triggerToast("Fehler beim Löschen des Boards", "error");
+                            } else {
+                                setActiveBoardId('');
+                                fetchFromSupabase();
+                                triggerToast("Board gelöscht", "info");
+                            }
+                        } else {
+                            const updatedBoards = boards.filter(b => b.id !== activeBoardId);
+                            const activeCols = columns.filter(c => c.board_id === activeBoardId).map(c => c.id);
+                            const updatedCols = columns.filter(c => c.board_id !== activeBoardId);
+                            const updatedCards = cards.filter(card => !activeCols.includes(card.column_id));
+                            
+                            setBoards(updatedBoards);
+                            setColumns(updatedCols);
+                            setCards(updatedCards);
 
-            // Wallpaper upload Wizard
-            document.getElementById('wiz-bg-upload').onchange = (e) => handleFileUpload(e.target.files[0], 'wallpaper-wiz');
+                            saveLocalData('ob_boards', updatedBoards);
+                            saveLocalData('ob_columns', updatedCols);
+                            saveLocalData('ob_cards', updatedCards);
 
-            // Card details modal
-            document.getElementById('btn-delete-card').onclick = deleteCardDetails;
-            document.getElementById('btn-close-card').onclick = () => document.getElementById('card-modal').classList.add('hidden');
-            document.getElementById('form-comment').onsubmit = submitDiscussionComment;
-            document.getElementById('edit-card-upload').onchange = (e) => handleFileUpload(e.target.files[0], 'card-attachment');
-            
-            document.getElementById('edit-card-title').oninput = (e) => updateCardField(state.activeCardId, { title: e.target.value });
-            document.getElementById('edit-card-content').oninput = (e) => updateCardField(state.activeCardId, { content: e.target.value });
-            document.getElementById('edit-card-url').onblur = (e) => {
-                updateCardField(state.activeCardId, { attachment_url: e.target.value.trim() });
-                loadSystemData();
-            };
-            document.getElementById('btn-remove-attachment').onclick = async () => {
-                await updateCardField(state.activeCardId, { attachment_url: '' });
-                await loadSystemData();
-                openCardDetailsModal(state.activeCardId);
-            };
-
-            // Overlay click dismiss Card Modal
-            document.getElementById('card-modal').onclick = (e) => {
-                if (e.target.id === 'card-modal') document.getElementById('card-modal').classList.add('hidden');
-            };
-
-            // Board Settings Modal
-            document.getElementById('btn-board-settings').onclick = openBoardSettings;
-            document.getElementById('btn-close-board-settings').onclick = () => document.getElementById('board-settings-modal').classList.add('hidden');
-            document.getElementById('set-bg-upload').onchange = (e) => handleFileUpload(e.target.files[0], 'wallpaper-settings');
-            document.getElementById('board-settings-form').onsubmit = handleSaveBoardSettings;
-            document.getElementById('btn-delete-board-settings').onclick = handleDeleteBoardSettings;
-
-            // Logout Handler
-            document.getElementById('btn-logout').onclick = async () => {
-                if (state.dbMode === 'supabase' && state.supabaseClient) {
-                    await state.supabaseClient.auth.signOut();
-                } else {
-                    safeStorage.removeItem('ob_local_session');
-                    safeStorage.removeItem('ob_local_username');
-                    safeStorage.removeItem('ob_local_avatar');
-                }
-                document.getElementById('account-modal').classList.add('hidden');
-                triggerToast("Erfolgreich abgemeldet", "success");
-                await fetchSystemSession();
-                await loadSystemData();
+                            if (updatedBoards.length > 0) {
+                                setActiveBoardId(updatedBoards[0].id);
+                            } else {
+                                setActiveBoardId('');
+                            }
+                            triggerToast("Board gelöscht", "info");
+                        }
+                    }
+                );
             };
 
-            // Confirmation dialogue buttons
-            document.getElementById('confirm-btn-cancel').onclick = () => {
-                document.getElementById('confirm-modal').classList.add('hidden');
-                confirmCallback = null;
-            };
-            document.getElementById('confirm-btn-ok').onclick = () => {
-                document.getElementById('confirm-modal').classList.add('hidden');
-                if (confirmCallback) confirmCallback();
-                confirmCallback = null;
-            };
-
-            // Theme Switcher Click
-            document.getElementById('btn-theme-toggle').onclick = () => {
-                state.theme = state.theme === 'light' ? 'dark' : 'light';
-                safeStorage.setItem('ob_theme', state.theme);
-                syncTheme();
-            };
-        }
-
-        // Open/Close Wizard
-        function toggleWizardModal(show) {
-            const modal = document.getElementById('board-wizard-modal');
-            if (show) {
-                document.getElementById('board-wizard-form').reset();
-                renderBackgroundPresets('wiz-presets');
-                modal.classList.remove('hidden');
-            } else {
-                modal.classList.add('hidden');
-            }
-        }
-
-        function renderBackgroundPresets(targetId) {
-            const target = document.getElementById(targetId);
-            target.innerHTML = '';
-            BOARD_BACKGROUNDS.forEach((bg, idx) => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = `p-3 rounded-xl border text-xs font-bold truncate transition-all ${bg.css} ${idx === 0 ? 'border-brand-600 wiz-preset-active ring-2 ring-brand-500/20' : 'border-slate-200 dark:border-slate-700'}`;
-                btn.dataset.id = bg.id;
-                btn.textContent = bg.name;
-                btn.onclick = () => {
-                    const btns = target.querySelectorAll('button');
-                    btns.forEach(b => b.classList.remove('border-brand-600', 'wiz-preset-active', 'ring-2', 'ring-brand-500/20'));
-                    btn.classList.add('border-brand-600', 'wiz-preset-active', 'ring-2', 'ring-brand-500/20');
+            // --- SPALTEN CRUD ---
+            const createColumn = async () => {
+                if (!newColumnTitle.trim() || !activeBoardId) return;
+                const nextPos = columns.length;
+                const newCol = {
+                    board_id: activeBoardId,
+                    title: newColumnTitle,
+                    position: nextPos
                 };
-                target.appendChild(btn);
-            });
-        }
 
-        // Open Auth modal
-        function openAuthModal(mode) {
-            state.authModalMode = mode;
-            const title = document.getElementById('auth-title');
-            const submitBtn = document.getElementById('auth-submit-btn');
-            const toggleBtn = document.getElementById('auth-toggle-mode');
-            const usernameField = document.getElementById('auth-username-field');
-
-            if (mode === 'register') {
-                title.textContent = "Registrieren";
-                submitBtn.textContent = "Konto erstellen";
-                toggleBtn.textContent = "Bereits ein Konto? Hier anmelden";
-                usernameField.classList.remove('hidden');
-            } else {
-                title.textContent = "Anmelden";
-                submitBtn.textContent = "Jetzt Anmelden";
-                toggleBtn.textContent = "Noch kein Konto? Hier registrieren";
-                usernameField.classList.add('hidden');
-            }
-            document.getElementById('auth-modal').classList.remove('hidden');
-        }
-
-        // Open Account Settings
-        function openAccountSettings() {
-            document.getElementById('acc-username-display').textContent = state.userProfile.username;
-            document.getElementById('acc-email-display').textContent = state.userSession?.email || 'Demo@openboard.local';
-            document.getElementById('acc-avatar-preview').src = state.userProfile.avatar;
-
-            document.getElementById('acc-new-username').value = state.userProfile.username;
-            document.getElementById('acc-new-email').value = state.userSession?.email || '';
-            document.getElementById('acc-new-password').value = '';
-
-            document.getElementById('account-modal').classList.remove('hidden');
-        }
-
-        // Open Board Settings
-        function openBoardSettings() {
-            const board = state.boards.find(b => b.id === state.activeBoardId);
-            if (!board) return;
-
-            document.getElementById('set-board-title').value = board.title;
-            document.getElementById('set-board-desc').value = board.description || '';
-            document.getElementById('set-board-public-write').checked = board.public_write;
-            document.getElementById('set-board-custom-color').value = board.custom_bg_val || '';
-            document.getElementById('set-board-default-color').value = board.default_card_color || 'bg-white';
-
-            renderSettingsPresets();
-
-            document.getElementById('board-settings-modal').classList.remove('remove');
-            document.getElementById('board-settings-modal').classList.remove('hidden');
-        }
-
-        // Save Board Settings
-        async function handleSaveBoardSettings(event) {
-            event.preventDefault();
-            const title = document.getElementById('set-board-title').value.trim();
-            const desc = document.getElementById('set-board-desc').value.trim();
-            const public_write = document.getElementById('set-board-public-write').checked;
-            const customBg = document.getElementById('set-board-custom-color').value.trim();
-            const default_color = document.getElementById('set-board-default-color').value;
-
-            const board = state.boards.find(b => b.id === state.activeBoardId);
-            if (!board) return;
-
-            const fields = {
-                title,
-                description: desc,
-                public_write,
-                custom_bg_val: customBg,
-                default_card_color: default_color,
-                background: board.background
+                if (dbMode === 'supabase') {
+                    const { error } = await supabaseClient.from('columns').insert([newCol]);
+                    if (error) console.error(error);
+                    else fetchFromSupabase();
+                } else {
+                    const localNewCol = { ...newCol, id: 'col-' + Date.now() };
+                    const updated = [...columns, localNewCol];
+                    setColumns(updated);
+                    saveLocalData('ob_columns', updated);
+                }
+                setNewColumnTitle('');
             };
 
-            if (state.dbMode === 'supabase' && state.supabaseClient) {
-                await state.supabaseClient.from('boards').update(fields).eq('id', state.activeBoardId);
-            } else {
-                state.boards = state.boards.map(b => b.id === state.activeBoardId ? { ...b, ...fields } : b);
-                safeStorage.setItem('ob_boards', JSON.stringify(state.boards));
-            }
+            const deleteColumn = (colId) => {
+                triggerConfirm(
+                    "Spalte löschen?",
+                    "Möchtest du diese Spalte mitsamt allen darin liegenden Kärtchen löschen?",
+                    async () => {
+                        if (dbMode === 'supabase') {
+                            const { error } = await supabaseClient.from('columns').delete().eq('id', colId);
+                            if (error) console.error(error);
+                            else fetchFromSupabase();
+                        } else {
+                            const updatedCols = columns.filter(c => c.id !== colId);
+                            const updatedCards = cards.filter(c => c.column_id !== colId);
+                            setColumns(updatedCols);
+                            setCards(updatedCards);
+                            saveLocalData('ob_columns', updatedCols);
+                            saveLocalData('ob_cards', updatedCards);
+                            triggerToast("Spalte gelöscht", "info");
+                        }
+                    }
+                );
+            };
 
-            document.getElementById('board-settings-modal').classList.add('hidden');
-            await loadSystemData();
-            triggerToast("Board-Einstellungen gespeichert!", "success");
-        }
-
-        // Delete Board
-        function handleDeleteBoardSettings() {
-            triggerConfirm("Board löschen?", "Möchtest du dieses Board mitsamt allen Spalten und Kärtchen wirklich löschen?", async () => {
-                if (state.dbMode === 'supabase' && state.supabaseClient) {
-                    await state.supabaseClient.from('boards').delete().eq('id', state.activeBoardId);
+            const renameColumn = async (colId, newTitle) => {
+                if (!newTitle.trim()) return;
+                if (dbMode === 'supabase') {
+                    const { error } = await supabaseClient.from('columns').update({ title: newTitle }).eq('id', colId);
+                    if (error) console.error(error);
                 } else {
-                    state.boards = state.boards.filter(b => b.id !== state.activeBoardId);
-                    safeStorage.setItem('ob_boards', JSON.stringify(state.boards));
+                    const updated = columns.map(c => c.id === colId ? { ...c, title: newTitle } : c);
+                    setColumns(updated);
+                    saveLocalData('ob_columns', updated);
                 }
-                document.getElementById('board-settings-modal').classList.add('hidden');
-                state.activeBoardId = '';
-                state.activeView = 'dashboard';
-                await loadSystemData();
-                routeView();
-                triggerToast("Board gelöscht", "info");
-            });
+            };
+
+            // --- KÄRTCHEN CRUD ---
+            const createCard = async (columnId) => {
+                const newCard = {
+                    column_id: columnId,
+                    title: 'Neues Kärtchen',
+                    content: 'Klicke zum Bearbeiten...',
+                    color: 'bg-white',
+                    attachment_url: '',
+                    likes: 0,
+                    position: cards.filter(c => c.column_id === columnId).length
+                };
+
+                if (dbMode === 'supabase') {
+                    const { data, error } = await supabaseClient.from('cards').insert([newCard]).select();
+                    if (error) console.error(error);
+                    else {
+                        fetchFromSupabase();
+                        setActiveCardModal(data[0]);
+                    }
+                } else {
+                    const localNewCard = { ...newCard, id: 'card-' + Date.now() };
+                    const updated = [...cards, localNewCard];
+                    setCards(updated);
+                    saveLocalData('ob_cards', updated);
+                    setActiveCardModal(localNewCard);
+                }
+            };
+
+            const updateCardDetail = async (cardId, fields) => {
+                if (dbMode === 'supabase') {
+                    const { error } = await supabaseClient.from('cards').update(fields).eq('id', cardId);
+                    if (error) console.error(error);
+                    else {
+                        fetchFromSupabase();
+                        if (activeCardModal && activeCardModal.id === cardId) {
+                            setActiveCardModal(prev => ({ ...prev, ...fields }));
+                        }
+                    }
+                } else {
+                    const updated = cards.map(c => c.id === cardId ? { ...c, ...fields } : c);
+                    setCards(updated);
+                    saveLocalData('ob_cards', updated);
+                    if (activeCardModal && activeCardModal.id === cardId) {
+                        setActiveCardModal(prev => ({ ...prev, ...fields }));
+                    }
+                }
+            };
+
+            const deleteCard = (cardId) => {
+                triggerConfirm(
+                    "Kärtchen löschen?",
+                    "Möchtest du dieses Kärtchen wirklich löschen?",
+                    async () => {
+                        if (dbMode === 'supabase') {
+                            const { error } = await supabaseClient.from('cards').delete().eq('id', cardId);
+                            if (error) console.error(error);
+                            else {
+                                setActiveCardModal(null);
+                                fetchFromSupabase();
+                                triggerToast("Kärtchen gelöscht", "info");
+                            }
+                        } else {
+                            const updated = cards.filter(c => c.id !== cardId);
+                            const updatedComments = comments.filter(com => com.card_id !== cardId);
+                            setCards(updated);
+                            setComments(updatedComments);
+                            saveLocalData('ob_cards', updated);
+                            saveLocalData('ob_comments', updatedComments);
+                            setActiveCardModal(null);
+                            triggerToast("Kärtchen gelöscht", "info");
+                        }
+                    }
+                );
+            };
+
+            const addLike = async (cardId, currentLikes) => {
+                const newLikes = (currentLikes || 0) + 1;
+                if (dbMode === 'supabase') {
+                    const { error } = await supabaseClient.from('cards').update({ likes: newLikes }).eq('id', cardId);
+                    if (error) console.error(error);
+                    else fetchFromSupabase();
+                } else {
+                    const updated = cards.map(c => c.id === cardId ? { ...c, likes: newLikes } : c);
+                    setCards(updated);
+                    saveLocalData('ob_cards', updated);
+                }
+            };
+
+            // --- KOMMENTARE ---
+            const addComment = async (cardId) => {
+                if (!newCommentText.trim()) return;
+                const newCom = {
+                    card_id: cardId,
+                    author: commentAuthor || 'Anonym',
+                    content: newCommentText
+                };
+
+                safeStorage.setItem('ob_author_name', commentAuthor);
+
+                if (dbMode === 'supabase') {
+                    const { error } = await supabaseClient.from('comments').insert([newCom]);
+                    if (error) console.error(error);
+                    else {
+                        setNewCommentText('');
+                        fetchFromSupabase();
+                    }
+                } else {
+                    const localNewCom = { ...newCom, id: 'com-' + Date.now(), created_at: new Date().toISOString() };
+                    const updated = [...comments, localNewCom];
+                    setComments(updated);
+                    saveLocalData('ob_comments', updated);
+                    setNewCommentText('');
+                }
+            };
+
+            // --- BEWEGUNGS-HILFEN PER BUTTONS ---
+            const moveCard = async (cardId, direction) => {
+                const cardIndex = cards.findIndex(c => c.id === cardId);
+                if (cardIndex === -1) return;
+                const card = cards[cardIndex];
+                const siblings = cards.filter(c => c.column_id === card.column_id).sort((a, b) => a.position - b.position);
+                const posInSiblings = siblings.findIndex(c => c.id === cardId);
+
+                if (direction === 'up' && posInSiblings > 0) {
+                    const swapWith = siblings[posInSiblings - 1];
+                    await updateCardDetail(card.id, { position: swapWith.position });
+                    await updateCardDetail(swapWith.id, { position: card.position });
+                } else if (direction === 'down' && posInSiblings < siblings.length - 1) {
+                    const swapWith = siblings[posInSiblings + 1];
+                    await updateCardDetail(card.id, { position: swapWith.position });
+                    await updateCardDetail(swapWith.id, { position: card.position });
+                }
+            };
+
+            // --- BACKUP & EXPORT (JSON) ---
+            const exportData = () => {
+                const backup = { boards, columns, cards, comments };
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `openboard-backup-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                triggerToast("Backup-Datei heruntergeladen!", "success");
+            };
+
+            const importData = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const parsed = JSON.parse(event.target.result);
+                        if (parsed.boards && parsed.columns) {
+                            if (dbMode === 'supabase') {
+                                triggerToast("Importiere Daten im Demo-Modus. Cloud-Imports bitte direkt im SQL-Editor vornehmen.", "error");
+                            } else {
+                                setBoards(parsed.boards || []);
+                                setColumns(parsed.columns || []);
+                                setCards(parsed.cards || []);
+                                setComments(parsed.comments || []);
+                                if (parsed.boards.length > 0) setActiveBoardId(parsed.boards[0].id);
+                                saveLocalData('ob_boards', parsed.boards || []);
+                                saveLocalData('ob_columns', parsed.columns || []);
+                                saveLocalData('ob_cards', parsed.cards || []);
+                                saveLocalData('ob_comments', parsed.comments || []);
+                                triggerToast("Backup erfolgreich geladen!", "success");
+                            }
+                        }
+                    } catch (err) {
+                        triggerToast("Ungültige Backup-Datei.", "error");
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            const SQL_SCHEMA = `-- KOPIERE DIESES SKRIPT IN DEN SUPABASE SQL EDITOR
+
+create extension if not exists "uuid-ossp";
+
+create table if not exists boards (
+  id uuid default uuid_generate_v4() primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  title text not null,
+  description text,
+  background text default 'from-blue-50 to-indigo-50',
+  owner_id uuid -- Verknüpfung mit auth.users(id) für Auth-Zuordnung
+);
+
+create table if not exists columns (
+  id uuid default uuid_generate_v4() primary key,
+  board_id uuid references boards(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  title text not null,
+  position int not null default 0
+);
+
+create table if not exists cards (
+  id uuid default uuid_generate_v4() primary key,
+  column_id uuid references columns(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  title text not null,
+  content text,
+  color text default 'bg-white',
+  attachment_url text,
+  likes int default 0,
+  position int not null default 0
+);
+
+create table if not exists comments (
+  id uuid default uuid_generate_v4() primary key,
+  card_id uuid references cards(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  author text not null default 'Anonym',
+  content text not null
+);
+
+alter publication supabase_realtime add table boards, columns, cards, comments;`;
+
+            const activeBoard = boards.find(b => b.id === activeBoardId) || boards[0];
+
+            return (
+                <div className={`min-h-screen flex flex-col transition-colors duration-300 ${activeBoard ? BOARD_BACKGROUNDS.find(bg => bg.id === activeBoard.background)?.css || 'bg-slate-50' : 'bg-slate-50'}`}>
+                    
+                    {/* --- TOAST NOTIFICATIONS --- */}
+                    {toast && (
+                        <div className="fixed top-5 right-5 z-[9999] animate-bounce">
+                            <div className={`flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white font-medium text-sm ${toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-rose-600' : 'bg-indigo-600'}`}>
+                                <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check' : toast.type === 'error' ? 'fa-circle-exclamation' : 'fa-bell'}`}></i>
+                                <span>{toast.message}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- CONFIRM DIALOG MODAL --- */}
+                    {confirmModal && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4">
+                                <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+                                    <i className="fa-solid fa-triangle-exclamation text-amber-500"></i>
+                                    {confirmModal.title}
+                                </h3>
+                                <p className="text-sm text-slate-600 leading-relaxed">{confirmModal.message}</p>
+                                <div className="flex justify-end gap-3 pt-2">
+                                    <button onClick={confirmModal.onCancel} className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-100 rounded-lg transition">Abbrechen</button>
+                                    <button onClick={confirmModal.onConfirm} className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition">Ja, löschen</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- AUTH REGISTRIERUNG / LOGIN MODAL --- */}
+                    {showAuthModal && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4">
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                    <h3 className="font-bold text-lg text-slate-900">
+                                        <i className="fa-solid fa-user-shield text-indigo-600 mr-2"></i>
+                                        {isRegistering ? "Konto erstellen" : "Anmelden"}
+                                    </h3>
+                                    <button onClick={() => setShowAuthModal(false)} className="text-slate-400 hover:text-slate-600"><i className="fa-solid fa-xmark text-lg"></i></button>
+                                </div>
+                                <form onSubmit={handleAuth} className="flex flex-col gap-3">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">E-Mail</label>
+                                        <input 
+                                            type="email" 
+                                            required 
+                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                                            placeholder="deine.mail@beispiel.de"
+                                            value={authEmail}
+                                            onChange={(e) => setAuthEmail(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Passwort</label>
+                                        <input 
+                                            type="password" 
+                                            required 
+                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                                            placeholder="Mindestens 6 Zeichen"
+                                            value={authPassword}
+                                            onChange={(e) => setAuthPassword(e.target.value)}
+                                        />
+                                    </div>
+                                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-xl mt-2 transition">
+                                        {isRegistering ? "Konto registrieren" : "Jetzt anmelden"}
+                                    </button>
+                                </form>
+                                <div className="text-center text-xs text-slate-500 border-t border-slate-100 pt-3">
+                                    {isRegistering ? (
+                                        <span>Bereits ein Konto? <button onClick={() => setIsRegistering(false)} className="text-indigo-600 font-semibold hover:underline">Hier anmelden</button></span>
+                                    ) : (
+                                        <span>Noch kein Konto? <button onClick={() => setIsRegistering(true)} className="text-indigo-600 font-semibold hover:underline">Hier registrieren</button></span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- HEADER --- */}
+                    <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-6 py-4 sticky top-0 z-10 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <div className="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-100">
+                                <i className="fa-solid fa-chalkboard text-xl"></i>
+                            </div>
+                            <div className="flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <select 
+                                        className="font-bold text-lg bg-transparent border-none text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded cursor-pointer"
+                                        value={activeBoardId}
+                                        onChange={(e) => setActiveBoardId(e.target.value)}
+                                    >
+                                        {boards.map(b => (
+                                            <option key={b.id} value={b.id}>{b.title}</option>
+                                        ))}
+                                        {boards.length === 0 && <option>Keine Boards vorhanden</option>}
+                                    </select>
+                                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${dbMode === 'supabase' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                                        <i className={`fa-solid ${dbMode === 'supabase' ? 'fa-cloud' : 'fa-laptop-code'} mr-1.5`}></i>
+                                        {dbMode === 'supabase' ? 'Supabase Live' : 'Demo Modus'}
+                                    </span>
+                                </div>
+                                <p className="text-sm text-slate-500">{activeBoard ? activeBoard.description : 'Erstelle ein Board, um zu starten!'}</p>
+                            </div>
+                        </div>
+
+                        {/* Actions im Header */}
+                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                            {/* Board Erstellen Formular */}
+                            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+                                <input 
+                                    type="text" 
+                                    placeholder={session ? "Neues Board..." : "Zum Erstellen anmelden..."}
+                                    disabled={!session}
+                                    className="px-3 py-1.5 text-sm bg-transparent rounded focus:outline-none w-full sm:w-40 disabled:cursor-not-allowed"
+                                    value={newBoardTitle}
+                                    onChange={(e) => setNewBoardTitle(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && createBoard()}
+                                />
+                                {session ? (
+                                    <button onClick={createBoard} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-all shrink-0">
+                                        Erstellen
+                                    </button>
+                                ) : (
+                                    <button onClick={() => setShowAuthModal(true)} className="bg-slate-300 hover:bg-indigo-600 text-slate-700 hover:text-white text-xs px-3 py-1.5 rounded-lg font-semibold transition-all shrink-0">
+                                        Anmelden
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                                {session ? (
+                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-xl text-xs font-semibold text-slate-700">
+                                        <i className="fa-solid fa-user text-indigo-500"></i>
+                                        <span className="truncate max-w-[120px]" title={session.user.email}>{session.user.email}</span>
+                                        <button onClick={handleLogout} className="text-rose-500 hover:text-rose-700 ml-1" title="Ausloggen">
+                                            <i className="fa-solid fa-right-from-bracket"></i>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => { setIsRegistering(false); setShowAuthModal(true); }} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-2 rounded-xl text-xs font-bold transition">
+                                        Anmelden
+                                    </button>
+                                )}
+
+                                <button onClick={exportData} className="p-2.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition" title="Backup exportieren">
+                                    <i className="fa-solid fa-download"></i>
+                                </button>
+
+                                <label className="p-2.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition cursor-pointer" title="Backup laden">
+                                    <i className="fa-solid fa-upload"></i>
+                                    <input type="file" onChange={importData} accept=".json" className="hidden" />
+                                </label>
+
+                                <button onClick={() => setShowSettings(!showSettings)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition ml-1" title="System-Setup & Board-Style">
+                                    <i className="fa-solid fa-gears text-sm"></i>
+                                    <span className="hidden md:inline">DB-Settings & Setup</span>
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* --- HAUPTBEREICH (GRID SPALTEN) --- */}
+                    {isInitialLoading ? (
+                        <div className="flex-1 flex flex-col items-center justify-center p-12">
+                            <div className="animate-spin text-4xl text-indigo-600 mb-4"><i className="fa-solid fa-spinner"></i></div>
+                            <p className="text-slate-600 font-medium">Lade Daten...</p>
+                        </div>
+                    ) : (
+                        <main className="flex-1 flex gap-6 p-6 overflow-x-auto items-start select-none">
+                            {activeBoard ? (
+                                <>
+                                    {/* Spalten rendern */}
+                                    {columns.filter(col => col.board_id === activeBoardId).map(col => {
+                                        const colCards = cards.filter(c => c.column_id === col.id).sort((a,b) => a.position - b.position);
+                                        return (
+                                            <div key={col.id} className="w-80 shrink-0 bg-slate-100/95 backdrop-blur-sm border border-slate-200/50 rounded-2xl flex flex-col max-h-[calc(100vh-140px)] shadow-sm">
+                                                {/* Spalten-Kopf */}
+                                                <div className="p-4 flex items-center justify-between border-b border-slate-200/60">
+                                                    <input 
+                                                        type="text" 
+                                                        className="font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none rounded px-1 w-44"
+                                                        defaultValue={col.title}
+                                                        onBlur={(e) => renameColumn(col.id, e.target.value)}
+                                                    />
+                                                    <div className="flex items-center gap-1 text-slate-400">
+                                                        <button onClick={() => createCard(col.id)} className="p-1.5 hover:text-indigo-600 hover:bg-white rounded-lg transition" title="Kärtchen hinzufügen">
+                                                            <i className="fa-solid fa-plus text-sm"></i>
+                                                        </button>
+                                                        <button onClick={() => deleteColumn(col.id)} className="p-1.5 hover:text-rose-600 hover:bg-white rounded-lg transition" title="Spalte löschen">
+                                                            <i className="fa-solid fa-trash-can text-sm"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Kärtchen-Liste */}
+                                                <div className="p-3 overflow-y-auto flex flex-col gap-3 flex-1">
+                                                    {colCards.map((card, index) => (
+                                                        <div 
+                                                            key={card.id} 
+                                                            className={`p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all cursor-pointer relative group flex flex-col gap-2 ${card.color || 'bg-white'}`}
+                                                            onClick={() => setActiveCardModal(card)}
+                                                        >
+                                                            {/* Card-Header */}
+                                                            <div className="flex justify-between items-start gap-2">
+                                                                <h4 className="font-semibold text-slate-900 leading-tight flex-1">{card.title}</h4>
+                                                                
+                                                                {/* Pfeile zur schnellen Sortierung */}
+                                                                <div className="hidden group-hover:flex items-center gap-1 bg-white/85 p-0.5 rounded-lg shadow-sm">
+                                                                    {index > 0 && (
+                                                                        <button 
+                                                                            onClick={(e) => { e.stopPropagation(); moveCard(card.id, 'up'); }}
+                                                                            className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded text-xs"
+                                                                            title="Nach oben"
+                                                                        >
+                                                                            <i className="fa-solid fa-arrow-up"></i>
+                                                                        </button>
+                                                                    )}
+                                                                    {index < colCards.length - 1 && (
+                                                                        <button 
+                                                                            onClick={(e) => { e.stopPropagation(); moveCard(card.id, 'down'); }}
+                                                                            className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded text-xs"
+                                                                            title="Nach unten"
+                                                                        >
+                                                                            <i className="fa-solid fa-arrow-down"></i>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Card-Inhalt */}
+                                                            <p className="text-sm text-slate-700 line-clamp-3 whitespace-pre-wrap">{card.content}</p>
+
+                                                            {/* Anhänge */}
+                                                            {card.attachment_url && (
+                                                                <a 
+                                                                    href={card.attachment_url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer" 
+                                                                    className="inline-flex items-center gap-1.5 text-xs text-indigo-600 font-medium hover:underline mt-1 bg-white/55 p-1 px-2.5 rounded-lg self-start"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <i className="fa-solid fa-link"></i>
+                                                                    Link öffnen
+                                                                </a>
+                                                            )}
+
+                                                            {/* Card-Footer */}
+                                                            <div className="flex items-center justify-between border-t border-slate-200/40 pt-2.5 mt-1 text-xs text-slate-500">
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); addLike(card.id, card.likes); }}
+                                                                    className="flex items-center gap-1 hover:text-red-500 transition font-medium"
+                                                                >
+                                                                    <i className="fa-regular fa-heart text-red-500"></i>
+                                                                    {card.likes || 0} Likes
+                                                                </button>
+
+                                                                <span className="flex items-center gap-1 font-medium">
+                                                                    <i className="fa-regular fa-comment"></i>
+                                                                    {comments.filter(com => com.card_id === card.id).length} Kommentare
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    {colCards.length === 0 && (
+                                                        <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-400 text-sm">
+                                                            Noch keine Kärtchen.
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Schnell-Erstellung */}
+                                                <div className="p-3 border-t border-slate-200/60">
+                                                    <button 
+                                                        onClick={() => createCard(col.id)}
+                                                        className="w-full bg-white hover:bg-slate-50 text-indigo-600 border border-slate-200 text-sm font-semibold py-2 rounded-xl flex items-center justify-center gap-2 shadow-sm transition"
+                                                    >
+                                                        <i className="fa-solid fa-plus"></i>
+                                                        Kärtchen hinzufügen
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* Neue Spalte hinzufügen */}
+                                    <div className="w-80 shrink-0 bg-white/50 border-2 border-dashed border-slate-300/80 rounded-2xl p-4 flex flex-col gap-3">
+                                        <h4 className="font-bold text-slate-600">Spalte hinzufügen</h4>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Spaltentitel..." 
+                                            className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                            value={newColumnTitle}
+                                            onChange={(e) => setNewColumnTitle(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && createColumn()}
+                                        />
+                                        <button 
+                                            onClick={createColumn}
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 rounded-xl transition shadow-sm"
+                                        >
+                                            Spalte erstellen
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center w-full py-12">
+                                    <p className="text-slate-500 text-lg">Erstelle links ein neues Board, um zu beginnen!</p>
+                                </div>
+                            )}
+                        </main>
+                    )}
+
+                    {/* --- SETTINGS MODAL --- */}
+                    {showSettings && (
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-end">
+                            <div className="w-full max-w-lg bg-white h-full shadow-2xl p-6 flex flex-col overflow-y-auto">
+                                <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                                    <h2 className="text-xl font-bold text-slate-800"><i className="fa-solid fa-database mr-2 text-indigo-600"></i>Datenbank & Setup</h2>
+                                    <button onClick={() => setShowSettings(false)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500">
+                                        <i className="fa-solid fa-xmark text-lg"></i>
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6 pt-4 flex-1">
+                                    {/* Supabase Anbindung */}
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                                        <h3 className="font-bold text-sm text-slate-700 uppercase tracking-wider">⚡ Supabase Live Synchronisation</h3>
+                                        <p className="text-xs text-slate-500 leading-relaxed">Trage hier deine Supabase-Verbindung ein. Die App wechselt dann automatisch in den Live-Synchronisierungsmodus.</p>
+                                        
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-600 block mb-1">SUPABASE_URL</label>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="https://deine-id.supabase.co" 
+                                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                    value={supabaseUrl}
+                                                    onChange={(e) => { setSupabaseUrl(e.target.value); safeStorage.setItem('ob_supabase_url', e.target.value); }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-600 block mb-1">SUPABASE_ANON_KEY</label>
+                                                <input 
+                                                    type="password" 
+                                                    placeholder="Dein anonymer API Key..." 
+                                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                    value={supabaseKey}
+                                                    onChange={(e) => { setSupabaseKey(e.target.value); safeStorage.setItem('ob_supabase_key', e.target.value); }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Board Einstellungen */}
+                                    {activeBoard && (
+                                        <div className="space-y-4">
+                                            <h3 className="font-bold text-sm text-slate-700 uppercase tracking-wider">🎨 Aktives Board anpassen</h3>
+                                            
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-600 block mb-1">Board Titel</label>
+                                                    <input 
+                                                        type="text" 
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                        value={activeBoard.title}
+                                                        onChange={(e) => updateBoardSettings(e.target.value, activeBoard.description, activeBoard.background)}
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-600 block mb-1">Board Beschreibung</label>
+                                                    <textarea 
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none h-20"
+                                                        value={activeBoard.description}
+                                                        onChange={(e) => updateBoardSettings(activeBoard.title, e.target.value, activeBoard.background)}
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-600 block mb-1">Board Hintergrund</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {BOARD_BACKGROUNDS.map(bg => (
+                                                            <button 
+                                                                key={bg.id}
+                                                                onClick={() => updateBoardSettings(activeBoard.title, activeBoard.description, bg.id)}
+                                                                className={`p-2 rounded-lg text-xs font-medium border text-left truncate ${bg.css} ${activeBoard.background === bg.id ? 'border-indigo-600 ring-2 ring-indigo-500/20' : 'border-slate-200'}`}
+                                                            >
+                                                                {bg.name}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button 
+                                                onClick={deleteActiveBoard}
+                                                className="w-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-sm font-semibold py-2.5 rounded-xl transition"
+                                            >
+                                                <i className="fa-solid fa-trash-can mr-2"></i>
+                                                Dieses Board löschen
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* SQL Editor Code */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="font-bold text-sm text-slate-700 uppercase tracking-wider">💾 Supabase SQL Schema</h3>
+                                            <button 
+                                                onClick={() => { 
+                                                    document.execCommand('copy'); 
+                                                    triggerToast("SQL-Skript kopiert!", "success");
+                                                }} 
+                                                className="text-xs text-indigo-600 font-semibold hover:underline"
+                                            >
+                                                Skript kopieren
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-500 leading-relaxed">Führe dieses Skript im SQL Editor deines Supabase-Projekts aus.</p>
+                                        <pre className="text-[10px] bg-slate-900 text-slate-100 p-3 rounded-lg overflow-x-auto max-h-40 font-mono">
+                                            {SQL_SCHEMA}
+                                        </pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- DETAILS & BEARBEITUNGS MODAL FÜR KÄRTCHEN --- */}
+                    {activeCardModal && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+                                
+                                {/* Linker Teil: Kärtchen-Inhalt */}
+                                <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-slate-200 overflow-y-auto space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Kärtchen bearbeiten</span>
+                                        <div className="flex gap-1.5">
+                                            {CARD_COLORS.map(color => (
+                                                <button 
+                                                    key={color.id}
+                                                    onClick={() => updateCardDetail(activeCardModal.id, { color: color.id })}
+                                                    className={`w-5 h-5 rounded-full border ${color.id} ${activeCardModal.color === color.id ? 'border-slate-800 ring-2 ring-slate-400' : 'border-slate-300'}`}
+                                                    title={color.name}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Titel</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none font-semibold text-lg"
+                                            value={activeCardModal.title}
+                                            onChange={(e) => updateCardDetail(activeCardModal.id, { title: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Beschreibung</label>
+                                        <textarea 
+                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm h-36 resize-y"
+                                            value={activeCardModal.content}
+                                            onChange={(e) => updateCardDetail(activeCardModal.id, { content: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Anhang-Link (URL)</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="https://beispiel.de"
+                                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-mono"
+                                            value={activeCardModal.attachment_url || ''}
+                                            onChange={(e) => updateCardDetail(activeCardModal.id, { attachment_url: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div className="pt-2 flex justify-between items-center">
+                                        <button 
+                                            onClick={() => deleteCard(activeCardModal.id)}
+                                            className="text-rose-600 hover:text-rose-700 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
+                                        >
+                                            <i className="fa-solid fa-trash-can"></i>
+                                            Kärtchen Löschen
+                                        </button>
+                                        
+                                        <button 
+                                            onClick={() => setActiveCardModal(null)}
+                                            className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-xl transition"
+                                        >
+                                            Schließen
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Rechter Teil: Kommentare */}
+                                <div className="w-full md:w-80 bg-slate-50 p-6 flex flex-col justify-between max-h-96 md:max-h-none overflow-y-auto">
+                                    <div className="space-y-4 flex-1 overflow-y-auto">
+                                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                            <i className="fa-regular fa-comments text-indigo-600"></i>
+                                            Kommentare
+                                        </h3>
+
+                                        <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                                            {comments.filter(com => com.card_id === activeCardModal.id).map(com => (
+                                                <div key={com.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-xs">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="font-bold text-slate-700">{com.author}</span>
+                                                    </div>
+                                                    <p className="text-slate-600">{com.content}</p>
+                                                </div>
+                                            ))}
+                                            {comments.filter(com => com.card_id === activeCardModal.id).length === 0 && (
+                                                <div className="text-center py-6 text-slate-400 text-xs">
+                                                    Keine Kommentare vorhanden.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Kommentar schreiben */}
+                                    <div className="pt-4 border-t border-slate-200 space-y-2 mt-4">
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Name"
+                                                className="w-1/3 px-2 py-1 bg-white border border-slate-200 rounded text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none font-semibold"
+                                                value={commentAuthor}
+                                                onChange={(e) => setCommentAuthor(e.target.value)}
+                                            />
+                                            <span className="text-xs text-slate-400 self-center">schreibt:</span>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Kommentar verfassen..."
+                                                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                value={newCommentText}
+                                                onChange={(e) => setNewCommentText(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && addComment(activeCardModal.id)}
+                                            />
+                                            <button 
+                                                onClick={() => addComment(activeCardModal.id)}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs transition"
+                                            >
+                                                <i className="fa-solid fa-paper-plane"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            );
         }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<OpenBoardApp />);
     </script>
 </body>
 </html>
