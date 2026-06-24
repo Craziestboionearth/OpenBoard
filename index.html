@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenBoard - Deine freie Pinnwand</title>
+    <!-- Tailwind CSS v3 CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(241, 245, 249, 0.5);
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(203, 213, 225, 0.8);
+            border-radius: 8px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.9);
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+        .board-bg-custom {
+            background-position: center;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col transition-all duration-500">
+
+    <!-- --- TOAST NOTIFICATIONS --- -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[9999] hidden pointer-events-none">
+        <div id="toast-box" class="flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-white font-semibold text-sm transition-all duration-300 transform translate-y-0">
+            <i id="toast-icon" class="fa-solid text-base"></i>
+            <span id="toast-message"></span>
+        </div>
+    </div>
+
+    <!-- --- CONFIRM DIALOG MODAL --- -->
+    <div id="confirm-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100 flex flex-col gap-5 transform scale-100 transition-all">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center">
+                <i class="fa-solid fa-triangle-exclamation text-amber-500 text-xl"></i>
+            </div>
+            <div>
+                <h3 id="confirm-title" class="font-extrabold text-xl text-slate-900 mb-2">Aktion bestätigen</h3>
+                <p id="confirm-message" class="text-sm text-slate-500 leading-relaxed"></p>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button id="confirm-btn-cancel" class="px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-100 rounded-xl transition">Abbrechen</button>
+                <button id="confirm-btn-ok" class="px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-lg shadow-rose-600/20 transition">Ja, Ausführen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- --- HEADER --- -->
+    <header class="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 px-6 py-4 sticky top-0 z-40 shadow-xs flex flex-col lg:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-4 w-full lg:w-auto">
+            <div class="bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-600/20 flex items-center justify-center">
+                <i class="fa-solid fa-chalkboard text-2xl"></i>
+            </div>
+            <div class="flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="board-select" class="font-extrabold text-xl bg-transparent border-none text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg cursor-pointer py-0.5 pr-8 pl-0">
+                        <!-- Wird dynamisch befüllt -->
+                    </select>
+                    <span id="status-badge" class="text-xs px-3 py-1 rounded-full font-semibold">
+                        <!-- Status -->
+                    </span>
+                </div>
+                <p id="board-description" class="text-xs text-slate-500 mt-0.5 font-medium">Lade Pinnwand...</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+            <!-- Board-Aktionen -->
+            <button id="btn-open-create-board" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-xl font-bold transition shadow-md shadow-indigo-600/10 flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i> Neues Board vorbereiten
+            </button>
+
+            <div class="h-6 w-px bg-slate-200 hidden sm:block"></div>
+
+            <div class="flex items-center gap-1.5">
+                <button id="btn-export" class="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition" title="Backup exportieren">
+                    <i class="fa-solid fa-download"></i>
+                </button>
+
+                <label class="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition cursor-pointer" title="Backup einlesen">
+                    <i class="fa-solid fa-upload"></i>
+                    <input id="input-import" type="file" accept=".json" class="hidden">
+                </label>
+
+                <button id="btn-settings" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ml-1">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    Admin-Bereich
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- --- SPALTEN CANVAS --- -->
+    <main id="main-canvas" class="flex-1 flex gap-8 p-8 overflow-x-auto items-start select-none">
+        <!-- Spalten & Kärtchen werden hier gerendert -->
+    </main>
+
+    <!-- --- CREATE BOARD MODAL --- -->
+    <div id="create-board-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 flex flex-col overflow-hidden transform scale-100 transition-all max-h-[90vh]">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2.5">
+                    <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i>
+                    Neues Board vorbereiten
+                </h2>
+                <button id="btn-close-create-board" class="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="form-create-board" class="p-8 space-y-6 overflow-y-auto flex-1">
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider block">Board Titel *</label>
+                    <input id="cb-title" type="text" required placeholder="z.B. Projektplanung Klasse 10b" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none font-medium">
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider block">Beschreibung</label>
+                    <textarea id="cb-desc" placeholder="Worum geht es auf dieser Pinnwand?" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none h-20 resize-none font-medium"></textarea>
+                </div>
+
+                <!-- Template Selection -->
+                <div class="space-y-3">
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider block">Board Struktur / Template</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label class="border-2 border-indigo-600 bg-indigo-50/20 p-4 rounded-2xl cursor-pointer flex items-start gap-3 transition hover:border-indigo-600" id="tpl-empty-label">
+                            <input type="radio" name="cb-template" value="empty" checked class="mt-1 text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="font-bold text-sm block text-slate-900">Leeres Board</span>
+                                <span class="text-xs text-slate-500">Keine Spalten vordefiniert. Erstelle eigene.</span>
+                            </div>
+                        </label>
+                        <label class="border-2 border-slate-200 p-4 rounded-2xl cursor-pointer flex items-start gap-3 transition hover:border-indigo-500" id="tpl-kanban-label">
+                            <input type="radio" name="cb-template" value="kanban" class="mt-1 text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="font-bold text-sm block text-slate-900">Kanban Board</span>
+                                <span class="text-xs text-slate-500">Vorbereitet mit: To-Do, In Arbeit, Erledigt.</span>
+                            </div>
+                        </label>
+                        <label class="border-2 border-slate-200 p-4 rounded-2xl cursor-pointer flex items-start gap-3 transition hover:border-indigo-500" id="tpl-weekly-label">
+                            <input type="radio" name="cb-template" value="weekly" class="mt-1 text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="font-bold text-sm block text-slate-900">Wochenplan</span>
+                                <span class="text-xs text-slate-500">Vorbereitet mit Spalten von Montag bis Freitag.</span>
+                            </div>
+                        </label>
+                        <label class="border-2 border-slate-200 p-4 rounded-2xl cursor-pointer flex items-start gap-3 transition hover:border-indigo-500" id="tpl-feedback-label">
+                            <input type="radio" name="cb-template" value="feedback" class="mt-1 text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="font-bold text-sm block text-slate-900">Brainstorming & Feedback</span>
+                                <span class="text-xs text-slate-500">Vorbereitet mit: Ideen, Fragen, Lob, Kritik.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Background Selector -->
+                <div class="space-y-3">
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider block">Hintergrund-Stil</label>
+                    <div id="cb-bg-presets" class="grid grid-cols-3 gap-2">
+                        <!-- Presets -->
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                        <input id="cb-custom-color" type="text" placeholder="Hex-Farbe (z.B. #f1f5f9)" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input id="cb-custom-image" type="text" placeholder="Bild-URL (Unsplash etc.)" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex justify-end gap-3">
+                    <button type="button" id="btn-cancel-create-board" class="px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-100 rounded-xl transition">Abbrechen</button>
+                    <button type="submit" class="px-6 py-3 text-xs font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-600/20 transition">Board erstellen & öffnen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- --- ADMIN / SETTINGS PANEL --- -->
+    <div id="settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-end hidden">
+        <div class="w-full max-w-lg bg-white h-full shadow-2xl p-8 flex flex-col overflow-y-auto border-l border-slate-100">
+            <div class="flex justify-between items-center pb-6 border-b border-slate-200/60">
+                <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2.5">
+                    <i class="fa-solid fa-shield-halved text-indigo-600"></i>
+                    Admin-Einstellungen
+                </h2>
+                <button id="btn-close-settings" class="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-8 pt-6 flex-1">
+                <!-- Admin Lock / Passwort-Schutz -->
+                <div id="admin-lock-container" class="bg-amber-50 border border-amber-200 p-5 rounded-2xl space-y-4">
+                    <h3 class="font-extrabold text-sm text-amber-900 flex items-center gap-2">
+                        <i class="fa-solid fa-lock"></i> Admin-Bereich gesichert
+                    </h3>
+                    <p class="text-xs text-amber-800 leading-relaxed">Bitte erstelle ein Admin-Passwort, um kritische Supabase-Einstellungen und das Löschen von Boards vor unbefugten Zugriffen zu schützen.</p>
+                    <div class="flex gap-2">
+                        <input id="admin-password-input" type="password" placeholder="Passwort eingeben..." class="flex-1 px-3 py-2 bg-white border border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <button id="btn-unlock-admin" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition">Anmelden</button>
+                    </div>
+                </div>
+
+                <!-- Inhalt, der erst nach Freischaltung sichtbar wird -->
+                <div id="admin-content" class="space-y-8 hidden">
+                    
+                    <!-- Supabase Credentials -->
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                        <h3 class="font-extrabold text-sm text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-cloud-bolt text-indigo-600"></i> Supabase Verbindung
+                        </h3>
+                        <p class="text-xs text-slate-500 leading-relaxed">Verbinde dein Board mit deiner Supabase-Datenbank für eine Echtzeit-Synchronisation zwischen allen Clients.</p>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">SUPABASE_URL</label>
+                                <input id="db-url" type="text" placeholder="https://deine-id.supabase.co" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">SUPABASE_ANON_KEY</label>
+                                <input id="db-key" type="password" placeholder="Dein anonymer API Key..." class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Board Settings -->
+                    <div id="board-customization" class="space-y-4">
+                        <h3 class="font-extrabold text-sm text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-palette text-indigo-600"></i> Board anpassen
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-xs font-bold text-slate-600 block mb-1">Board Titel</label>
+                                <input id="edit-board-title" type="text" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium">
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-slate-600 block mb-1">Board Beschreibung</label>
+                                <textarea id="edit-board-desc" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none h-20 resize-none font-medium"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-slate-600 block mb-1">Board Hintergrund</label>
+                                <div id="bg-selector-grid" class="grid grid-cols-2 gap-2">
+                                    <!-- Dynamisch -->
+                                </div>
+                                <div class="grid grid-cols-1 gap-2 mt-2">
+                                    <input id="edit-board-custom-color" type="text" placeholder="Hex-Farbe eingeben (z.B. #ff0055)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                    <input id="edit-board-custom-img" type="text" placeholder="Oder Bild-URL (Unsplash etc.)" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4">
+                            <button id="btn-delete-board" class="w-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-extrabold uppercase tracking-wider py-3.5 rounded-2xl transition">
+                                <i class="fa-solid fa-trash-can mr-2"></i>
+                                Dieses Board vollständig löschen
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- SQL Schema -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-extrabold text-xs text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-database text-indigo-600"></i> Supabase SQL Schema
+                            </h3>
+                            <button id="btn-copy-sql" type="button" class="text-xs text-indigo-600 font-bold hover:underline">Kopieren</button>
+                        </div>
+                        <p class="text-xs text-slate-400 leading-relaxed">Führe dieses Skript im SQL Editor deines Supabase-Projekts aus.</p>
+                        <pre id="sql-code-block" class="text-[10px] bg-slate-900 text-slate-300 p-4 rounded-xl overflow-x-auto max-h-40 font-mono"></pre>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- --- CARD DETAIL MODAL (SPACIOUS & COLLABORATIVE) --- -->
+    <div id="card-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div id="card-modal-content" class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh] border border-slate-100 transform scale-100 transition-all">
+            
+            <!-- Linker Teil: Kärtchen-Inhalt -->
+            <div class="flex-1 p-8 border-b md:border-b-0 md:border-r border-slate-200/60 overflow-y-auto space-y-5">
+                <div class="flex justify-between items-center">
+                    <span class="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest">Kärtchen bearbeiten</span>
+                    <div id="card-color-picker" class="flex gap-2">
+                        <!-- Farben -->
+                    </div>
+                </div>
+
+                <!-- Bild-Vorschau -->
+                <div id="card-preview-container" class="hidden">
+                    <img id="card-image-preview" src="" alt="Vorschau" class="w-full h-48 object-cover rounded-2xl shadow-sm border border-slate-100">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Kärtchen-Titel</label>
+                    <input id="edit-card-title" type="text" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold text-xl text-slate-900">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Beschreibung</label>
+                    <textarea id="edit-card-content" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm h-40 resize-none font-medium leading-relaxed"></textarea>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Anhang-Link (Bild- oder Web-URL)</label>
+                    <input id="edit-card-url" type="text" placeholder="https://beispiel.de/bild.png" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs font-mono">
+                </div>
+
+                <div class="pt-4 flex justify-between items-center border-t border-slate-100">
+                    <button id="btn-delete-card" class="text-rose-600 hover:text-rose-700 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-trash-can"></i>
+                        Kärtchen löschen
+                    </button>
+                    
+                    <button id="btn-close-card" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold uppercase tracking-wider px-5 py-3 rounded-xl transition shadow-lg shadow-slate-900/10">
+                        Änderungen sichern
+                    </button>
+                </div>
+            </div>
+
+            <!-- Rechter Teil: Kommentare -->
+            <div class="w-full md:w-96 bg-slate-50/55 p-8 flex flex-col justify-between max-h-[40vh] md:max-h-none overflow-y-auto">
+                <div class="space-y-4 flex-1 overflow-y-auto">
+                    <h3 class="font-extrabold text-slate-800 flex items-center gap-2 text-base">
+                        <i class="fa-regular fa-comments text-indigo-600 text-lg"></i>
+                        Diskussion
+                    </h3>
+
+                    <div id="comments-list" class="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                        <!-- Kommentare -->
+                    </div>
+                </div>
+
+                <!-- Kommentar-Formular -->
+                <form id="form-comment" class="pt-4 border-t border-slate-200/60 space-y-3 mt-4">
+                    <div class="flex gap-2">
+                        <input id="comment-author" type="text" placeholder="Name" required class="w-1/2 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold">
+                        <span class="text-xs text-slate-400 self-center">schreibt:</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <input id="comment-text" type="text" required placeholder="Nachricht verfassen..." class="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-md shadow-indigo-600/10">
+                            Senden
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- --- JAVASCRIPT LOGIC (NATIVE VANILLA ARCHITECTURE) --- -->
+    <script>
+        // --- SECURE FALLBACK STORAGE SYSTEM ---
+        const safeStorage = {
+            getItem: (key) => {
+                try { return localStorage.getItem(key); } catch (e) { return safeStorage._memory[key] || null; }
+            },
+            setItem: (key, value) => {
+                try { localStorage.setItem(key, value); } catch (e) { safeStorage._memory[key] = value; }
+            },
+            removeItem: (key) => {
+                try { localStorage.removeItem(key); } catch (e) { delete safeStorage._memory[key]; }
+            },
+            _memory: {}
+        };
+
+        // --- CONSTANTS ---
+        const CARD_COLORS = [
+            { id: 'bg-white', name: 'Standard (Weiß)', text: 'text-slate-800', border: 'border-slate-200' },
+            { id: 'bg-amber-50', name: 'Zitronengelb', text: 'text-amber-900', border: 'border-amber-200' },
+            { id: 'bg-rose-50', name: 'Pastellrot', text: 'text-rose-900', border: 'border-rose-200' },
+            { id: 'bg-emerald-50', name: 'Mintgrün', text: 'text-emerald-900', border: 'border-emerald-200' },
+            { id: 'bg-sky-50', name: 'Eisblau', text: 'text-sky-900', border: 'border-sky-200' },
+            { id: 'bg-purple-50', name: 'Flieder', text: 'text-purple-900', border: 'border-purple-200' },
+        ];
+
+        const BOARD_BACKGROUNDS = [
+            { id: 'from-blue-50 to-indigo-50', name: 'Sanftes Blau', css: 'bg-gradient-to-br from-blue-50 to-indigo-50' },
+            { id: 'from-emerald-50 to-teal-50', name: 'Natur-Grün', css: 'bg-gradient-to-br from-emerald-50 to-teal-50' },
+            { id: 'from-rose-50 to-amber-50', name: 'Warmes Licht', css: 'bg-gradient-to-br from-rose-50 to-amber-50' },
+            { id: 'from-slate-100 to-slate-200', name: 'Klassisch Grau', css: 'bg-gradient-to-br from-slate-100 to-slate-200' },
+            { id: 'from-violet-50 to-fuchsia-50', name: 'Flieder-Traum', css: 'bg-gradient-to-br from-violet-50 to-fuchsia-50' }
+        ];
+
+        const SQL_SCHEMA = `-- KOPIERE DIESES SKRIPT IN DEN SUPABASE SQL EDITOR
+
+create extension if not exists "uuid-ossp";
+
+create table if not exists boards (
+  id uuid default uuid_generate_v4() primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  title text not null,
+  description text,
+  background text default 'from-blue-50 to-indigo-50',
+  custom_bg_val text
+);
+
+create table if not exists columns (
+  id uuid default uuid_generate_v4() primary key,
+  board_id uuid references boards(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  title text not null,
+  position int not null default 0
+);
+
+create table if not exists cards (
+  id uuid default uuid_generate_v4() primary key,
+  column_id uuid references columns(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  title text not null,
+  content text,
+  color text default 'bg-white',
+  attachment_url text,
+  likes int default 0,
+  position int not null default 0
+);
+
+create table if not exists comments (
+  id uuid default uuid_generate_v4() primary key,
+  card_id uuid references cards(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  author text not null default 'Anonym',
+  content text not null
+);
+
+alter table boards enable row level security;
+alter table columns enable row level security;
+alter table cards enable row level security;
+alter table comments enable row level security;
+
+-- Einfache RLS-Richtlinien (Jeder darf lesen/schreiben für maximale Usability als Padlet-Alternative)
+create policy "Allow all read" on boards for select using (true);
+create policy "Allow all write" on boards for all using (true);
+create policy "Allow all read cols" on columns for select using (true);
+create policy "Allow all write cols" on columns for all using (true);
+create policy "Allow all read cards" on cards for select using (true);
+create policy "Allow all write cards" on cards for all using (true);
+create policy "Allow all read comments" on comments for select using (true);
+create policy "Allow all write comments" on comments for all using (true);
+
+alter publication supabase_realtime add table boards, columns, cards, comments;`;
+
+        // --- GLOBAL APP STATE ---
+        let state = {
+            supabaseUrl: safeStorage.getItem('ob_supabase_url') || '',
+            supabaseKey: safeStorage.getItem('ob_supabase_key') || '',
+            dbMode: 'local',
+            supabaseClient: null,
+            isAdminUnlocked: false,
+            adminPasswordHash: safeStorage.getItem('ob_admin_pw_hash') || '',
+            boards: [],
+            activeBoardId: '',
+            columns: [],
+            cards: [],
+            comments: [],
+            activeCardId: null,
+            commentAuthor: safeStorage.getItem('ob_author_name') || 'Anonym'
+        };
+
+        // --- TOAST SYSTEMS ---
+        let toastTimeout = null;
+        function triggerToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const box = document.getElementById('toast-box');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-message');
+
+            msg.textContent = message;
+            container.classList.remove('hidden');
+
+            box.className = "flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-white font-semibold text-sm transition-all duration-300 transform translate-y-0";
+            if (type === 'success') {
+                box.classList.add('bg-emerald-600');
+                icon.className = 'fa-solid fa-circle-check';
+            } else if (type === 'error') {
+                box.classList.add('bg-rose-600');
+                icon.className = 'fa-solid fa-circle-exclamation';
+            } else {
+                box.classList.add('bg-indigo-600');
+                icon.className = 'fa-solid fa-bell';
+            }
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                container.classList.add('hidden');
+            }, 4000);
+        }
+
+        // --- CONFIRMATION MODAL SYSTEM ---
+        let confirmCallback = null;
+        function triggerConfirm(title, message, onConfirm) {
+            const modal = document.getElementById('confirm-modal');
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            modal.classList.remove('hidden');
+            confirmCallback = onConfirm;
+        }
+
+        // --- BACKEND INIT & REALTIME ---
+        function initSupabase() {
+            if (state.supabaseUrl && state.supabaseKey) {
+                try {
+                    const clientLoader = window.supabase || window.Supabase;
+                    if (clientLoader) {
+                        state.supabaseClient = clientLoader.createClient(state.supabaseUrl, state.supabaseKey);
+                        state.dbMode = 'supabase';
+                        subscribeToRealtime();
+                    } else {
+                        state.dbMode = 'local';
+                    }
+                } catch (e) {
+                    state.dbMode = 'local';
+                }
+            } else {
+                state.dbMode = 'local';
+            }
+        }
+
+        function subscribeToRealtime() {
+            if (state.dbMode === 'supabase' && state.supabaseClient) {
+                state.supabaseClient
+                    .channel('schema-db-changes')
+                    .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+                        fetchData();
+                    })
+                    .subscribe();
+            }
+        }
+
+        // --- DATA LOADERS ---
+        async function fetchData() {
+            if (state.dbMode === 'supabase' && state.supabaseClient) {
+                try {
+                    const { data: boardsData, error: bErr } = await state.supabaseClient.from('boards').select('*').order('created_at', { ascending: true });
+                    if (bErr) throw bErr;
+                    state.boards = boardsData;
+
+                    if (boardsData.length > 0 && !state.activeBoardId) {
+                        state.activeBoardId = boardsData[0].id;
+                    }
+
+                    if (state.activeBoardId) {
+                        const { data: columnsData, error: cErr } = await state.supabaseClient.from('columns').select('*').eq('board_id', state.activeBoardId).order('position', { ascending: true });
+                        if (cErr) throw cErr;
+                        state.columns = columnsData;
+
+                        const colIds = columnsData.map(c => c.id);
+                        if (colIds.length > 0) {
+                            const { data: cardsData, error: cardErr } = await state.supabaseClient.from('cards').select('*').in('column_id', colIds).order('position', { ascending: true });
+                            if (cardErr) throw cardErr;
+                            state.cards = cardsData;
+
+                            const cardIds = cardsData.map(c => c.id);
+                            if (cardIds.length > 0) {
+                                const { data: commentsData, error: comErr } = await state.supabaseClient.from('comments').select('*').in('card_id', cardIds).order('created_at', { ascending: true });
+                                if (comErr) throw comErr;
+                                state.comments = commentsData;
+                            } else {
+                                state.comments = [];
+                            }
+                        } else {
+                            state.cards = [];
+                            state.comments = [];
+                        }
+                    }
+                } catch (err) {
+                    console.error("Supabase Error, Fallback active: ", err);
+                    state.dbMode = 'local';
+                    loadLocalData();
+                }
+            } else {
+                loadLocalData();
+            }
+            renderApp();
+        }
+
+        function loadLocalData() {
+            const defaultB = [
+                { id: 'board-1', title: 'Mein Erstes OpenBoard 🚀', description: 'Klicke oben rechts auf Admin-Bereich, um ein eigenes Board vorzubereiten!', background: 'from-blue-50 to-indigo-50', custom_bg_val: '' }
+            ];
+            const defaultCol = [
+                { id: 'col-1', board_id: 'board-1', title: 'Brainstorming 💡', position: 0 },
+                { id: 'col-2', board_id: 'board-1', title: 'Im Feedback-Check ⚙️', position: 1 },
+                { id: 'col-3', board_id: 'board-1', title: 'Erledigte Meilensteine 🎉', position: 2 }
+            ];
+            const defaultC = [
+                { id: 'card-1', column_id: 'col-1', title: 'Ein Beispielfeld', content: 'Klicke mich an, um Anhänge zu hinterlegen oder Kommentare zu schreiben!', color: 'bg-white', attachment_url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=400&q=80', likes: 4, position: 0 }
+            ];
+            const defaultCom = [
+                { id: 'com-1', card_id: 'card-1', author: 'Team-Mitglied', content: 'Großartige Funktionalität! Sieht sehr geräumig aus.' }
+            ];
+
+            state.boards = getParsedLocalItem('ob_boards', defaultB);
+            state.columns = getParsedLocalItem('ob_columns', defaultCol);
+            state.cards = getParsedLocalItem('ob_cards', defaultC);
+            state.comments = getParsedLocalItem('ob_comments', defaultCom);
+
+            if (state.boards.length > 0 && !state.activeBoardId) {
+                state.activeBoardId = state.boards[0].id;
+            }
+        }
+
+        function getParsedLocalItem(key, defaultVal) {
+            const data = safeStorage.getItem(key);
+            return data ? JSON.parse(data) : defaultVal;
+        }
+
+        function saveLocalAppSet() {
+            safeStorage.setItem('ob_boards', JSON.stringify(state.boards));
+            safeStorage.setItem('ob_columns', JSON.stringify(state.columns));
+            safeStorage.setItem('ob_cards', JSON.stringify(state.cards));
+            safeStorage.setItem('ob_comments', JSON.stringify(state.comments));
+        }
+
+        // --- APP GRAPHICS RENDERING ---
+        function isImage(url) {
+            if (!url) return false;
+            return url.match(/\.(jpeg|jpg|gif|png|webp|svg)/i) != null || url.startsWith('https://images.unsplash.com');
+        }
+
+        function renderApp() {
+            const activeBoard = state.boards.find(b => b.id === state.activeBoardId) || state.boards[0];
+
+            // Set background properties
+            if (activeBoard) {
+                if (activeBoard.custom_bg_val) {
+                    if (activeBoard.custom_bg_val.startsWith('#') || activeBoard.custom_bg_val.startsWith('rgb')) {
+                        document.body.style.background = activeBoard.custom_bg_val;
+                        document.body.className = "text-slate-800 min-h-screen flex flex-col transition-all duration-500";
+                    } else {
+                        document.body.style.backgroundImage = `url('${activeBoard.custom_bg_val}')`;
+                        document.body.className = "text-slate-800 min-h-screen flex flex-col transition-all duration-500 board-bg-custom";
+                    }
+                } else {
+                    document.body.style.backgroundImage = '';
+                    document.body.style.background = '';
+                    const bgConfig = BOARD_BACKGROUNDS.find(bg => bg.id === activeBoard.background) || BOARD_BACKGROUNDS[0];
+                    document.body.className = `text-slate-800 min-h-screen flex flex-col transition-all duration-500 bg-gradient-to-br ${bgConfig.css}`;
+                }
+                document.getElementById('board-description').textContent = activeBoard.description || 'Keine Beschreibung vorhanden.';
+            } else {
+                document.body.className = "bg-slate-50 text-slate-800 min-h-screen flex flex-col transition-all duration-500";
+                document.getElementById('board-description').textContent = 'Erstelle ein Board, um loszulegen.';
+            }
+
+            // Populate Board Selector
+            const select = document.getElementById('board-select');
+            select.innerHTML = '';
+            state.boards.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.id;
+                opt.textContent = b.title;
+                opt.selected = b.id === state.activeBoardId;
+                select.appendChild(opt);
+            });
+
+            // Badge Setup
+            const badge = document.getElementById('status-badge');
+            if (state.dbMode === 'supabase') {
+                badge.className = "text-[10px] px-3 py-1 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/50 uppercase tracking-wider";
+                badge.innerHTML = `<i class="fa-solid fa-cloud mr-1.5 animate-pulse"></i>Live`;
+            } else {
+                badge.className = "text-[10px] px-3 py-1 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200/50 uppercase tracking-wider";
+                badge.innerHTML = `<i class="fa-solid fa-laptop-code mr-1.5"></i>Lokal`;
+            }
+
+            // Render Columns on Canvas
+            const canvas = document.getElementById('main-canvas');
+            canvas.innerHTML = '';
+
+            if (activeBoard) {
+                const activeCols = state.columns.filter(c => c.board_id === activeBoard.id).sort((a,b) => a.position - b.position);
+
+                activeCols.forEach(col => {
+                    const colCards = state.cards.filter(c => c.column_id === col.id).sort((a,b) => a.position - b.position);
+                    const colDiv = document.createElement('div');
+                    colDiv.className = "w-80 shrink-0 bg-white/70 backdrop-blur-md border border-slate-200/40 rounded-3xl flex flex-col max-h-[calc(100vh-160px)] shadow-lg shadow-slate-100/50 transition-all";
+
+                    let cardsHTML = '';
+                    colCards.forEach((card, index) => {
+                        const commentsCount = state.comments.filter(com => com.card_id === card.id).length;
+                        const imageRender = isImage(card.attachment_url) ? `
+                            <img src="${card.attachment_url}" class="w-full h-32 object-cover rounded-xl mt-1.5 mb-1 shadow-xs border border-slate-200/20" alt="Card Preview">
+                        ` : '';
+
+                        const attachmentButton = card.attachment_url && !isImage(card.attachment_url) ? `
+                            <a href="${card.attachment_url}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 text-xs text-indigo-600 font-bold bg-indigo-50/50 px-2.5 py-1 rounded-lg mt-1 border border-indigo-100 hover:bg-indigo-100 transition">
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Anhang öffnen
+                            </a>
+                        ` : '';
+
+                        const up = index > 0 ? `<button onclick="event.stopPropagation(); shiftCard('${card.id}', 'up')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg"><i class="fa-solid fa-arrow-up"></i></button>` : '';
+                        const down = index < colCards.length - 1 ? `<button onclick="event.stopPropagation(); shiftCard('${card.id}', 'down')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg"><i class="fa-solid fa-arrow-down"></i></button>` : '';
+
+                        cardsHTML += `
+                            <div class="p-5 rounded-2xl border border-slate-100 shadow-xs hover:shadow-xl transition-all duration-300 cursor-pointer relative group flex flex-col gap-2.5 ${card.color || 'bg-white'}" onclick="openCardModal('${card.id}')">
+                                <div class="flex justify-between items-start gap-2">
+                                    <h4 class="font-bold text-slate-900 leading-snug flex-1">${card.title}</h4>
+                                    <div class="hidden group-hover:flex items-center gap-0.5 bg-white/95 p-0.5 rounded-lg shadow-sm border border-slate-100">
+                                        ${up}
+                                        ${down}
+                                    </div>
+                                </div>
+                                ${imageRender}
+                                <p class="text-sm text-slate-600 leading-relaxed font-medium line-clamp-4 whitespace-pre-wrap">${card.content || ''}</p>
+                                ${attachmentButton}
+                                <div class="flex items-center justify-between border-t border-slate-200/40 pt-3 text-xs text-slate-400 font-bold">
+                                    <button onclick="event.stopPropagation(); handleLike('${card.id}', ${card.likes || 0})" class="flex items-center gap-1.5 hover:text-rose-500 transition">
+                                        <i class="fa-regular fa-heart text-rose-500"></i>
+                                        <span>${card.likes || 0}</span>
+                                    </button>
+                                    <span class="flex items-center gap-1.5">
+                                        <i class="fa-regular fa-comment text-indigo-500"></i>
+                                        ${commentsCount}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    colDiv.innerHTML = `
+                        <div class="p-4 flex items-center justify-between border-b border-slate-200/50">
+                            <input type="text" class="font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none rounded px-1 w-48 py-0.5" value="${col.title}" onblur="renameColumn('${col.id}', this.value)">
+                            <div class="flex items-center gap-0.5 text-slate-400">
+                                <button onclick="addCard('${col.id}')" class="p-1.5 hover:text-indigo-600 hover:bg-white rounded-lg transition" title="Kärtchen erstellen"><i class="fa-solid fa-plus"></i></button>
+                                <button onclick="removeColumn('${col.id}')" class="p-1.5 hover:text-rose-600 hover:bg-white rounded-lg transition" title="Spalte löschen"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        </div>
+                        <div class="p-4 overflow-y-auto flex flex-col gap-4 flex-1">
+                            ${cardsHTML}
+                        </div>
+                        <div class="p-4 border-t border-slate-200/50">
+                            <button onclick="addCard('${col.id}')" class="w-full bg-white hover:bg-slate-50 text-indigo-600 border border-slate-200 text-xs font-bold uppercase tracking-wider py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs transition">
+                                <i class="fa-solid fa-plus text-[10px]"></i> Kärtchen hinzufügen
+                            </button>
+                        </div>
+                    `;
+                    canvas.appendChild(colDiv);
+                });
+
+                // Spalte hinzufügen
+                const addColDiv = document.createElement('div');
+                addColDiv.className = "w-80 shrink-0 bg-white/30 border-2 border-dashed border-slate-300/60 rounded-3xl p-5 flex flex-col gap-4 backdrop-blur-xs";
+                addColDiv.innerHTML = `
+                    <h4 class="font-extrabold text-slate-700 text-sm">Neue Spalte einfügen</h4>
+                    <input id="new-column-title-input" type="text" placeholder="Titel der Spalte..." class="px-4 py-3 bg-white/85 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <button onclick="createColumnOnBoard()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider py-3 rounded-xl shadow-md shadow-indigo-600/10 transition">Spalte anlegen</button>
+                `;
+                canvas.appendChild(addColDiv);
+            }
+        }
+
+        // --- WRITE / WRITE ACTION EVENTS ---
+
+        // Board anlegen
+        async function createBoardFromSetup(event) {
+            event.preventDefault();
+            const title = document.getElementById('cb-title').value.trim();
+            const desc = document.getElementById('cb-desc').value.trim();
+            const template = document.querySelector('input[name="cb-template"]:checked').value;
+
+            // Background parameters
+            let background = 'from-blue-50 to-indigo-50';
+            let custom_bg_val = '';
+
+            const activePreset = document.querySelector('.bg-preset-active');
+            if (activePreset) {
+                background = activePreset.dataset.id;
+            }
+
+            const customColor = document.getElementById('cb-custom-color').value.trim();
+            const customImg = document.getElementById('cb-custom-image').value.trim();
+
+            if (customColor) custom_bg_val = customColor;
+            else if (customImg) custom_bg_val = customImg;
+
+            const newBoard = { title, description: desc, background, custom_bg_val };
+
+            let boardId = '';
+
+            if (state.dbMode === 'supabase') {
+                const { data, error } = await state.supabaseClient.from('boards').insert([newBoard]).select();
+                if (error) {
+                    triggerToast("Fehler beim Cloud-Speichern.", "error");
+                    return;
+                }
+                boardId = data[0].id;
+            } else {
+                boardId = 'board-' + Date.now();
+                const localBoard = { ...newBoard, id: boardId };
+                state.boards.push(localBoard);
+            }
+
+            // Create Columns based on templates
+            const templateCols = [];
+            if (template === 'kanban') {
+                templateCols.push('Zu Erledigen 📝', 'In Arbeit 🛠️', 'Erfolgreich Abgeschlossen 🎉');
+            } else if (template === 'weekly') {
+                templateCols.push('Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag');
+            } else if (template === 'feedback') {
+                templateCols.push('Neue Ideen 💡', 'Offene Fragen ❓', 'Lob & Feedback ⭐', 'Kritik & Hinweise ⚠️');
+            }
+
+            for (let i = 0; i < templateCols.length; i++) {
+                const newCol = { board_id: boardId, title: templateCols[i], position: i };
+                if (state.dbMode === 'supabase') {
+                    await state.supabaseClient.from('columns').insert([newCol]);
+                } else {
+                    state.columns.push({ ...newCol, id: `col-${Date.now()}-${i}` });
+                }
+            }
+
+            if (state.dbMode === 'local') {
+                saveLocalAppSet();
+            }
+
+            state.activeBoardId = boardId;
+            await fetchData();
+            toggleCreateBoardModal(false);
+            triggerToast("Board erfolgreich vorbereitet!", "success");
+        }
+
+        // Spalte erstellen
+        async function createColumnOnBoard() {
+            const input = document.getElementById('new-column-title-input');
+            const title = input.value.trim();
+            if (!title || !state.activeBoardId) return;
+
+            const nextPos = state.columns.filter(c => c.board_id === state.activeBoardId).length;
+            const newCol = { board_id: state.activeBoardId, title, position: nextPos };
+
+            if (state.dbMode === 'supabase') {
+                await state.supabaseClient.from('columns').insert([newCol]);
+                await fetchData();
+            } else {
+                state.columns.push({ ...newCol, id: 'col-' + Date.now() });
+                saveLocalAppSet();
+                await fetchData();
+            }
+            input.value = '';
+        }
+
+        // Spalte umbenennen
+        async function renameColumn(colId, newTitle) {
+            if (!newTitle.trim()) return;
+            if (state.dbMode === 'supabase') {
+                await state.supabaseClient.from('columns').update({ title: newTitle }).eq('id', colId);
+                await fetchData();
+            } else {
+                state.columns = state.columns.map(c => c.id === colId ? { ...c, title: newTitle } : c);
+                saveLocalAppSet();
+                renderApp();
+            }
+        }
+
+        // Spalte löschen
+        function removeColumn(colId) {
+            triggerConfirm("Spalte löschen?", "Möchtest du diese Spalte mitsamt allen Kärtchen unwiderruflich löschen?", async () => {
+                if (state.dbMode === 'supabase') {
+                    await state.supabaseClient.from('columns').delete().eq('id', colId);
+                    await fetchData();
+                } else {
+                    state.columns = state.columns.filter(c => c.id !== colId);
+                    state.cards = state.cards.filter(card => card.column_id !== colId);
+                    saveLocalAppSet();
+                    await fetchData();
+                }
+                triggerToast("Spalte gelöscht", "info");
+            });
+        }
+
+        // Kärtchen hinzufügen
+        async function addCard(columnId) {
+            const newC = {
+                column_id: columnId,
+                title: 'Neues Kärtchen',
+                content: 'Schreibe hier deine Notiz...',
+                color: 'bg-white',
+                attachment_url: '',
+                likes: 0,
+                position: state.cards.filter(c => c.column_id === columnId).length
+            };
+
+            if (state.dbMode === 'supabase') {
+                const { data, error } = await state.supabaseClient.from('cards').insert([newC]).select();
+                if (error) triggerToast("Fehler beim Hinzufügen", "error");
+                else {
+                    await fetchData();
+                    openCardModal(data[0].id);
+                }
+            } else {
+                const localCard = { ...newC, id: 'card-' + Date.now() };
+                state.cards.push(localCard);
+                saveLocalAppSet();
+                await fetchData();
+                openCardModal(localCard.id);
+            }
+        }
+
+        // Kärtchen Parameter updaten
+        async function saveCardField(cardId, fields) {
+            if (state.dbMode === 'supabase') {
+                await state.supabaseClient.from('cards').update(fields).eq('id', cardId);
+                await fetchData();
+            } else {
+                state.cards = state.cards.map(c => c.id === cardId ? { ...c, ...fields } : c);
+                saveLocalAppSet();
+                renderApp();
+            }
+        }
+
+        // Likes
+        async function handleLike(cardId, curLikes) {
+            await saveCardField(cardId, { likes: curLikes + 1 });
+        }
+
+        // Shifting positions
+        async function shiftCard(cardId, dir) {
+            const card = state.cards.find(c => c.id === cardId);
+            if (!card) return;
+            const sbls = state.cards.filter(c => c.column_id === card.column_id).sort((a,b) => a.position - b.position);
+            const pos = sbls.findIndex(s => s.id === cardId);
+
+            if (dir === 'up' && pos > 0) {
+                const other = sbls[pos - 1];
+                await saveCardField(card.id, { position: other.position });
+                await saveCardField(other.id, { position: card.position });
+            } else if (dir === 'down' && pos < sbls.length - 1) {
+                const other = sbls[pos + 1];
+                await saveCardField(card.id, { position: other.position });
+                await saveCardField(other.id, { position: card.position });
+            }
+            await fetchData();
+        }
+
+        // Kärtchen Löschen
+        function deleteCard(cardId) {
+            triggerConfirm("Kärtchen löschen?", "Möchtest du diese Notizkarte wirklich entfernen?", async () => {
+                if (state.dbMode === 'supabase') {
+                    await state.supabaseClient.from('cards').delete().eq('id', cardId);
+                    closeCardModal();
+                    await fetchData();
+                } else {
+                    state.cards = state.cards.filter(c => c.id !== cardId);
+                    state.comments = state.comments.filter(com => com.card_id !== cardId);
+                    saveLocalAppSet();
+                    closeCardModal();
+                    await fetchData();
+                }
+                triggerToast("Notiz gelöscht", "info");
+            });
+        }
+
+        // --- DISKUSSION / KOMMENTARE ---
+        async function submitComment(event) {
+            event.preventDefault();
+            const author = document.getElementById('comment-author').value.trim() || 'Anonym';
+            const text = document.getElementById('comment-text').value.trim();
+
+            if (!text || !state.activeCardId) return;
+
+            safeStorage.setItem('ob_author_name', author);
+            const newCom = { card_id: state.activeCardId, author, content: text };
+
+            if (state.dbMode === 'supabase') {
+                await state.supabaseClient.from('comments').insert([newCom]);
+                document.getElementById('comment-text').value = '';
+                await fetchData();
+                renderComments(state.activeCardId);
+            } else {
+                const localCom = { ...newCom, id: 'com-' + Date.now(), created_at: new Date().toISOString() };
+                state.comments.push(localCom);
+                saveLocalAppSet();
+                document.getElementById('comment-text').value = '';
+                await fetchData();
+                renderComments(state.activeCardId);
+            }
+        }
+
+        function renderComments(cardId) {
+            const list = document.getElementById('comments-list');
+            list.innerHTML = '';
+            const cardComs = state.comments.filter(c => c.card_id === cardId).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+
+            cardComs.forEach(com => {
+                const div = document.createElement('div');
+                div.className = "bg-white p-4 rounded-2xl border border-slate-100 shadow-xs text-xs space-y-1";
+                div.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-extrabold text-slate-800">${com.author}</span>
+                    </div>
+                    <p class="text-slate-600 leading-relaxed font-medium">${com.content}</p>
+                `;
+                list.appendChild(div);
+            });
+
+            if (cardComs.length === 0) {
+                list.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs font-semibold">Keine Kommentare vorhanden. Sei der Erste!</div>`;
+            }
+        }
+
+        // --- MODAL TOGGLES ---
+        function toggleCreateBoardModal(show) {
+            const modal = document.getElementById('create-board-modal');
+            if (show) {
+                document.getElementById('form-create-board').reset();
+                renderBackgroundPresets('cb-bg-presets');
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function renderBackgroundPresets(targetId) {
+            const target = document.getElementById(targetId);
+            target.innerHTML = '';
+            BOARD_BACKGROUNDS.forEach((bg, idx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `p-3 rounded-xl border text-xs font-bold truncate transition-all ${bg.css} ${idx === 0 ? 'border-indigo-600 bg-preset-active ring-2 ring-indigo-500/20' : 'border-slate-200'}`;
+                btn.dataset.id = bg.id;
+                btn.textContent = bg.name;
+                btn.onclick = () => {
+                    const btns = target.querySelectorAll('button');
+                    btns.forEach(b => b.classList.remove('border-indigo-600', 'bg-preset-active', 'ring-2', 'ring-indigo-500/20'));
+                    btn.classList.add('border-indigo-600', 'bg-preset-active', 'ring-2', 'ring-indigo-500/20');
+                };
+                target.appendChild(btn);
+            });
+        }
+
+        function openCardModal(cardId) {
+            state.activeCardId = cardId;
+            const card = state.cards.find(c => c.id === cardId);
+            if (!card) return;
+
+            document.getElementById('edit-card-title').value = card.title || '';
+            document.getElementById('edit-card-content').value = card.content || '';
+            document.getElementById('edit-card-url').value = card.attachment_url || '';
+            document.getElementById('comment-author').value = safeStorage.getItem('ob_author_name') || 'Anonym';
+
+            // Bildvorschau anpassen
+            const previewCont = document.getElementById('card-preview-container');
+            const previewImg = document.getElementById('card-image-preview');
+            if (isImage(card.attachment_url)) {
+                previewImg.src = card.attachment_url;
+                previewCont.classList.remove('hidden');
+            } else {
+                previewCont.classList.add('hidden');
+            }
+
+            // Farb-Auswahl
+            const picker = document.getElementById('card-color-picker');
+            picker.innerHTML = '';
+            CARD_COLORS.forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = `w-6 h-6 rounded-full border cursor-pointer transition ${c.id} ${card.color === c.id ? 'border-slate-800 ring-4 ring-slate-200' : 'border-slate-300'}`;
+                btn.title = c.name;
+                btn.onclick = async () => {
+                    await saveCardField(cardId, { color: c.id });
+                    openCardModal(cardId);
+                };
+                picker.appendChild(btn);
+            });
+
+            renderComments(cardId);
+            document.getElementById('card-modal').classList.remove('hidden');
+        }
+
+        function closeCardModal() {
+            document.getElementById('card-modal').classList.add('hidden');
+            state.activeCardId = null;
+        }
+
+        // Admin-System
+        function setAdminPassword() {
+            const password = document.getElementById('admin-password-input').value;
+            if (!password) return;
+
+            // Einfache Klartext-Demo-Verschlüsselung (In Produktion echte PBKDF2/Crypto verwenden)
+            const hash = btoa(password);
+            state.adminPasswordHash = hash;
+            safeStorage.setItem('ob_admin_pw_hash', hash);
+            state.isAdminUnlocked = true;
+            triggerToast("Admin-Modus freigeschaltet!", "success");
+            renderAdminPanel();
+        }
+
+        function renderAdminPanel() {
+            const lockCont = document.getElementById('admin-lock-container');
+            const adminContent = document.getElementById('admin-content');
+
+            if (state.isAdminUnlocked || !state.adminPasswordHash) {
+                lockCont.classList.add('hidden');
+                adminContent.classList.remove('hidden');
+
+                // Felder befüllen
+                document.getElementById('db-url').value = state.supabaseUrl || '';
+                document.getElementById('db-key').value = state.supabaseKey || '';
+
+                const activeBoard = state.boards.find(b => b.id === state.activeBoardId);
+                if (activeBoard) {
+                    document.getElementById('edit-board-title').value = activeBoard.title || '';
+                    document.getElementById('edit-board-desc').value = activeBoard.description || '';
+                    document.getElementById('edit-board-custom-color').value = activeBoard.custom_bg_val || '';
+
+                    // Background Grid
+                    const grid = document.getElementById('bg-selector-grid');
+                    grid.innerHTML = '';
+                    BOARD_BACKGROUNDS.forEach(bg => {
+                        const btn = document.createElement('button');
+                        btn.className = `p-2.5 rounded-xl border text-[11px] font-bold text-left truncate ${bg.css} ${activeBoard.background === bg.id ? 'border-indigo-600 ring-2 ring-indigo-500/20' : 'border-slate-200'}`;
+                        btn.textContent = bg.name;
+                        btn.onclick = async () => {
+                            await updateBoardSettings({ background: bg.id, custom_bg_val: '' });
+                            renderAdminPanel();
+                        };
+                        grid.appendChild(btn);
+                    });
+                }
+            } else {
+                lockCont.classList.remove('hidden');
+                adminContent.classList.add('hidden');
+            }
+        }
+
+        async function updateBoardSettings(fields) {
+            if (!state.activeBoardId) return;
+            if (state.dbMode === 'supabase') {
+                await state.supabaseClient.from('boards').update(fields).eq('id', state.activeBoardId);
+                await fetchData();
+            } else {
+                state.boards = state.boards.map(b => b.id === state.activeBoardId ? { ...b, ...fields } : b);
+                saveLocalAppSet();
+                await fetchData();
+            }
+        }
+
+        function deleteActiveBoard() {
+            triggerConfirm("Board löschen?", "Möchtest du dieses Board mitsamt allen Inhalten unwiderruflich löschen?", async () => {
+                if (state.dbMode === 'supabase') {
+                    await state.supabaseClient.from('boards').delete().eq('id', state.activeBoardId);
+                    state.activeBoardId = '';
+                    toggleSettingsModal(false);
+                    await fetchData();
+                } else {
+                    state.boards = state.boards.filter(b => b.id !== state.activeBoardId);
+                    saveLocalAppSet();
+                    state.activeBoardId = state.boards.length > 0 ? state.boards[0].id : '';
+                    toggleSettingsModal(false);
+                    await fetchData();
+                }
+                triggerToast("Board gelöscht", "info");
+            });
+        }
+
+        function toggleSettingsModal(show) {
+            const modal = document.getElementById('settings-modal');
+            if (show) {
+                renderAdminPanel();
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // --- BACKUPS ---
+        function exportBoardBackup() {
+            const backup = { boards: state.boards, columns: state.columns, cards: state.cards, comments: state.comments };
+            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `openboard-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            triggerToast("Backup-Datei heruntergeladen!", "success");
+        }
+
+        function importBoardBackup(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const parsed = JSON.parse(event.target.result);
+                    if (parsed.boards && parsed.columns) {
+                        if (state.dbMode === 'supabase') {
+                            triggerToast("Bitte importiere Daten im Live-Modus via Supabase SQL Editor.", "error");
+                        } else {
+                            state.boards = parsed.boards || [];
+                            state.columns = parsed.columns || [];
+                            state.cards = parsed.cards || [];
+                            state.comments = parsed.comments || [];
+                            if (state.boards.length > 0) state.activeBoardId = state.boards[0].id;
+
+                            saveLocalAppSet();
+                            await fetchData();
+                            triggerToast("Backup erfolgreich geladen!", "success");
+                        }
+                    }
+                } catch (err) {
+                    triggerToast("Ungültiges Backup-Format.", "error");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // --- LIFECYCLE INITIALIZATION ---
+        window.addEventListener('DOMContentLoaded', async () => {
+            initSupabase();
+            await fetchData();
+
+            // SQL Code Injection
+            document.getElementById('sql-code-block').textContent = SQL_SCHEMA;
+
+            // Bind Global Elements
+            document.getElementById('board-select').onchange = (e) => {
+                state.activeBoardId = e.target.value;
+                fetchData();
+            };
+
+            // Buttons
+            document.getElementById('btn-open-create-board').onclick = () => toggleCreateBoardModal(true);
+            document.getElementById('btn-close-create-board').onclick = () => toggleCreateBoardModal(false);
+            document.getElementById('btn-cancel-create-board').onclick = () => toggleCreateBoardModal(false);
+            document.getElementById('form-create-board').onsubmit = createBoardFromSetup;
+
+            document.getElementById('btn-export').onclick = exportBoardBackup;
+            document.getElementById('input-import').onchange = importBoardBackup;
+
+            document.getElementById('btn-settings').onclick = () => toggleSettingsModal(true);
+            document.getElementById('btn-close-settings').onclick = () => toggleSettingsModal(false);
+
+            // Admin Lock
+            document.getElementById('btn-unlock-admin').onclick = () => {
+                const entered = document.getElementById('admin-password-input').value;
+                if (btoa(entered) === state.adminPasswordHash) {
+                    state.isAdminUnlocked = true;
+                    renderAdminPanel();
+                } else {
+                    triggerToast("Falsches Admin-Passwort!", "error");
+                }
+            };
+
+            // Realtime Admin DB Inputs
+            document.getElementById('db-url').onblur = (e) => {
+                state.supabaseUrl = e.target.value.trim();
+                safeStorage.setItem('ob_supabase_url', state.supabaseUrl);
+                initSupabase();
+                fetchData();
+            };
+            document.getElementById('db-key').onblur = (e) => {
+                state.supabaseKey = e.target.value.trim();
+                safeStorage.setItem('ob_supabase_key', state.supabaseKey);
+                initSupabase();
+                fetchData();
+            };
+
+            // Edit Board Settings
+            document.getElementById('edit-board-title').oninput = (e) => updateBoardSettings({ title: e.target.value });
+            document.getElementById('edit-board-desc').oninput = (e) => updateBoardSettings({ description: e.target.value });
+            document.getElementById('edit-board-custom-color').onblur = (e) => updateBoardSettings({ custom_bg_val: e.target.value });
+            document.getElementById('edit-board-custom-img').onblur = (e) => updateBoardSettings({ custom_bg_val: e.target.value });
+            document.getElementById('btn-delete-board').onclick = deleteActiveBoard;
+
+            // SQL Copy System
+            document.getElementById('btn-copy-sql').onclick = () => {
+                document.execCommand('copy');
+                try { navigator.clipboard.writeText(SQL_SCHEMA); } catch (e) {}
+                triggerToast("SQL Schema kopiert!", "success");
+            };
+
+            // Card Modal
+            document.getElementById('edit-card-title').oninput = (e) => saveCardField(state.activeCardId, { title: e.target.value });
+            document.getElementById('edit-card-content').oninput = (e) => saveCardField(state.activeCardId, { content: e.target.value });
+            
+            document.getElementById('edit-card-url').onblur = (e) => {
+                const val = e.target.value.trim();
+                saveCardField(state.activeCardId, { attachment_url: val });
+                openCardModal(state.activeCardId);
+            };
+
+            document.getElementById('btn-delete-card').onclick = () => deleteCard(state.activeCardId);
+            document.getElementById('btn-close-card').onclick = closeCardModal;
+
+            // Form Submit Comments (No Reloads)
+            document.getElementById('form-comment').onsubmit = submitComment;
+
+            // Confirm Box cancel/ok
+            document.getElementById('confirm-btn-cancel').onclick = () => {
+                document.getElementById('confirm-modal').classList.add('hidden');
+                confirmCallback = null;
+            };
+            document.getElementById('confirm-btn-ok').onclick = () => {
+                document.getElementById('confirm-modal').classList.add('hidden');
+                if (confirmCallback) confirmCallback();
+                confirmCallback = null;
+            };
+
+            // Close Card Modal on overlay click (Outside-Click)
+            document.getElementById('card-modal').onclick = (e) => {
+                if (e.target.id === 'card-modal') {
+                    closeCardModal();
+                }
+            };
+        });
+    </script>
+</body>
+</html>
